@@ -1,0 +1,58 @@
+{
+  "d772edd0-6ca8-4d57-a8d1-eb58b71f57e0": {
+    "name": "Tarea para javaw.exe",
+    "process_name": "javaw.exe",
+    "hotkey": "ctrl+alt+1",
+    "high_affinity": [
+      0,
+      1
+    ],
+    "low_affinity": [
+      0
+    ],
+    "alert_type": "combinado",
+    "custom_notification": null
+  },
+  "b7abcff8-7fe7-41a5-bb7e-506bdad3d7c3": {
+    "name": "Tarea para javaw.exe",
+    "process_name": "javaw.exe",
+    "hotkey": "ctrl+alt+2",
+    "high_affinity": [
+      1
+    ],
+    "low_affinity": [
+      0,
+      1
+    ],
+    "alert_type": "combinado",
+    "custom_notification": null
+  },
+  "3453b45d-7a81-4411-b01f-0134c913e3ec": {
+    "name": "Bajar.exe",
+    "process_name": "javaw.exe",
+    "hotkey": "ctrl+shift+alt+quotedbl",
+    "high_affinity": [
+      0
+    ],
+    "low_affinity": [
+      0,
+      1
+    ],
+    "alert_type": "combinado",
+    "custom_notification": null
+  },
+  "dfcbbe61-315f-46fe-8a80-e95539dfe4fc": {
+    "name": "Subir javaw.exe",
+    "process_name": "javaw.exe",
+    "hotkey": "ctrl+shift+alt+exclam",
+    "high_affinity": [
+      0,
+      1
+    ],
+    "low_affinity": [
+      0
+    ],
+    "alert_type": "combinado",
+    "custom_notification": null
+  }
+}

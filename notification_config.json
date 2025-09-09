@@ -1,0 +1,9 @@
+{
+  "sound_enabled": true,
+  "sound_file": "C:/Windows/Media/Windows Unlock.wav",
+  "message_high": "🚀 Afinidad ALTA aplicada",
+  "message_low": "💚 Afinidad BAJA aplicada",
+  "show_process_name": true,
+  "duration": 3000,
+  "position": "top-right"
+}
