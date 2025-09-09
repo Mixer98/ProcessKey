@@ -34,7 +34,10 @@ class AffinityManager:
     def __init__(self, root):
         self.root = root
         self.root.title("Administrador de Afinidad de Procesos")
-        self.root.geometry("900x700")
+        
+        # Maximizar la ventana al inicio
+        self.root.state('zoomed')  # En Windows maximiza la ventana
+        
         self.root.configure(bg='#f0f0f0')
         
         # Variables
@@ -97,52 +100,56 @@ class AffinityManager:
         main_frame = ttk.Frame(self.root, padding="10")
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
-        # Configurar peso de las filas y columnas
+        # Configurar peso de las filas y columnas para mejor proporcionalidad
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
-        main_frame.columnconfigure(1, weight=1)  # Notebook
-        main_frame.columnconfigure(0, weight=0, minsize=300)  # Log a la izquierda
-        main_frame.rowconfigure(1, weight=1)
+        main_frame.columnconfigure(0, weight=3, minsize=800)  # Notebook ocupa 75% del espacio
+        main_frame.columnconfigure(1, weight=1, minsize=350)  # Log ocupa 25% del espacio
+        main_frame.rowconfigure(0, weight=0)  # Fila del título sin peso
+        main_frame.rowconfigure(1, weight=1)  # Fila principal con todo el peso
         
-        # Título
-        title_label = ttk.Label(main_frame, text="Administrador de Afinidad de Procesos", 
-                               font=('Arial', 16, 'bold'))
-        title_label.grid(row=0, column=0, columnspan=3, pady=(0, 10))
+        # Título más destacado
+        title_label = ttk.Label(main_frame, text="🖥️ Administrador de Afinidad de Procesos", 
+                               font=('Arial', 18, 'bold'))
+        title_label.grid(row=0, column=0, columnspan=2, pady=(0, 15), sticky=(tk.W, tk.E))
         
-        # Advertencia de permisos
+        # Advertencia de permisos (solo si no es admin)
         if not self.is_admin:
             warning_frame = ttk.Frame(main_frame)
-            warning_frame.grid(row=0, column=0, columnspan=3, pady=(0, 10), sticky=(tk.W, tk.E))
+            warning_frame.grid(row=0, column=0, columnspan=2, pady=(35, 15), sticky=(tk.W, tk.E))
             
             warning_label = ttk.Label(warning_frame, 
                                     text="⚠️ Ejecute como administrador para modificar la afinidad de todos los procesos",
-                                    foreground='red', font=('Arial', 9))
+                                    foreground='red', font=('Arial', 10, 'bold'))
             warning_label.pack()
         
-        # Frame izquierdo - Registro de Actividad (movido a la izquierda)
-        log_frame = ttk.LabelFrame(main_frame, text="Registro de Actividad", padding="5")
-        log_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 10))
+        # Crear notebook para pestañas (lado izquierdo - 75% del espacio)
+        self.notebook = ttk.Notebook(main_frame)
+        self.notebook.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 15))
+
+        # Frame derecho - Registro de Actividad (25% del espacio)
+        log_frame = ttk.LabelFrame(main_frame, text="📝 Registro de Actividad", padding="8")
+        log_frame.grid(row=1, column=1, sticky=(tk.W, tk.E, tk.N, tk.S))
         log_frame.rowconfigure(0, weight=1)
         log_frame.columnconfigure(0, weight=1)
         
-        self.log_text = scrolledtext.ScrolledText(log_frame, height=8, state='disabled', width=35)
+        # Log de actividad más grande y mejor proporcionado
+        self.log_text = scrolledtext.ScrolledText(log_frame, height=25, state='disabled', 
+                                                 width=45, font=('Consolas', 9))
         self.log_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-
-        # Crear notebook para pestañas (ahora a la derecha)
-        self.notebook = ttk.Notebook(main_frame)
-        self.notebook.grid(row=1, column=1, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # Pestaña 1: Control Manual
         manual_frame = ttk.Frame(self.notebook)
-        self.notebook.add(manual_frame, text="Control Manual")
+        self.notebook.add(manual_frame, text="🎯 Control Manual")
         
-        # Configurar grid para pestaña manual
-        manual_frame.columnconfigure(1, weight=1)
+        # Configurar grid para pestaña manual con mejor proporcionalidad
+        manual_frame.columnconfigure(0, weight=2, minsize=500)  # Lista de procesos - 60%
+        manual_frame.columnconfigure(1, weight=1, minsize=350)  # Control afinidad - 40%
         manual_frame.rowconfigure(0, weight=1)
         
-        # Frame izquierdo - Lista de procesos (en pestaña manual)
-        left_frame = ttk.LabelFrame(manual_frame, text="Procesos en Ejecución", padding="5")
-        left_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 5))
+        # Frame izquierdo - Lista de procesos (60% del espacio)
+        left_frame = ttk.LabelFrame(manual_frame, text="📋 Procesos en Ejecución", padding="8")
+        left_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 10))
         left_frame.rowconfigure(1, weight=1)
         left_frame.columnconfigure(0, weight=1)
         
@@ -169,20 +176,21 @@ class AffinityManager:
                                 command=self.refresh_process_list)
         refresh_btn.grid(row=1, column=0, sticky=(tk.W, tk.E))
         
-        # Treeview para mostrar procesos
+        # Treeview para mostrar procesos - mejor dimensionado para ventana maximizada
         columns = ('PID', 'Nombre', 'CPU%', 'Memoria')
-        self.process_tree = ttk.Treeview(left_frame, columns=columns, show='headings', height=15)
+        self.process_tree = ttk.Treeview(left_frame, columns=columns, show='headings', height=25)
         
-        # Configurar columnas
+        # Configurar columnas con mejor proporción
         self.process_tree.heading('PID', text='PID')
         self.process_tree.heading('Nombre', text='Nombre del Proceso')
         self.process_tree.heading('CPU%', text='CPU %')
         self.process_tree.heading('Memoria', text='Memoria (MB)')
         
-        self.process_tree.column('PID', width=80)
-        self.process_tree.column('Nombre', width=200)
-        self.process_tree.column('CPU%', width=80)
-        self.process_tree.column('Memoria', width=100)
+        # Anchos mejorados para ventana maximizada
+        self.process_tree.column('PID', width=90, minwidth=70)
+        self.process_tree.column('Nombre', width=300, minwidth=200)
+        self.process_tree.column('CPU%', width=90, minwidth=70)
+        self.process_tree.column('Memoria', width=120, minwidth=90)
         
         self.process_tree.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
@@ -194,41 +202,39 @@ class AffinityManager:
         # Bind evento de selección
         self.process_tree.bind('<<TreeviewSelect>>', self.on_process_select)
         
-        # Frame derecho - Control de afinidad (en pestaña manual)
-        right_frame = ttk.LabelFrame(manual_frame, text="Control de Afinidad de CPU", padding="5")
+        # Frame derecho - Control de afinidad (40% del espacio)
+        right_frame = ttk.LabelFrame(manual_frame, text="⚙️ Control de Afinidad de CPU", padding="8")
         right_frame.grid(row=0, column=1, sticky=(tk.W, tk.E, tk.N, tk.S))
         right_frame.rowconfigure(2, weight=1)
+        right_frame.columnconfigure(0, weight=1)
         
-        # Información del proceso seleccionado
-        info_frame = ttk.Frame(right_frame)
-        info_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
+        # Información del proceso seleccionado - más espaciada
+        info_frame = ttk.LabelFrame(right_frame, text="📊 Información del Proceso", padding="8")
+        info_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 15))
         info_frame.columnconfigure(1, weight=1)
         
-        ttk.Label(info_frame, text="Proceso Seleccionado:").grid(row=0, column=0, sticky=tk.W)
-        self.selected_process_label = ttk.Label(info_frame, text="Ninguno", font=('Arial', 10, 'bold'))
-        self.selected_process_label.grid(row=0, column=1, sticky=tk.W, padx=(10, 0))
+        ttk.Label(info_frame, text="Proceso Seleccionado:", font=('Arial', 9, 'bold')).grid(row=0, column=0, sticky=tk.W, pady=3)
+        self.selected_process_label = ttk.Label(info_frame, text="Ninguno", font=('Arial', 10, 'bold'), foreground='blue')
+        self.selected_process_label.grid(row=0, column=1, sticky=tk.W, padx=(10, 0), pady=3)
         
-        ttk.Label(info_frame, text="PID:").grid(row=1, column=0, sticky=tk.W)
-        self.pid_label = ttk.Label(info_frame, text="-")
-        self.pid_label.grid(row=1, column=1, sticky=tk.W, padx=(10, 0))
+        ttk.Label(info_frame, text="PID:", font=('Arial', 9, 'bold')).grid(row=1, column=0, sticky=tk.W, pady=3)
+        self.pid_label = ttk.Label(info_frame, text="-", font=('Arial', 10))
+        self.pid_label.grid(row=1, column=1, sticky=tk.W, padx=(10, 0), pady=3)
         
-        ttk.Label(info_frame, text="Afinidad Actual:").grid(row=2, column=0, sticky=tk.W)
-        self.current_affinity_label = ttk.Label(info_frame, text="-")
-        self.current_affinity_label.grid(row=2, column=1, sticky=tk.W, padx=(10, 0))
+        ttk.Label(info_frame, text="Afinidad Actual:", font=('Arial', 9, 'bold')).grid(row=2, column=0, sticky=tk.W, pady=3)
+        self.current_affinity_label = ttk.Label(info_frame, text="-", font=('Arial', 10))
+        self.current_affinity_label.grid(row=2, column=1, sticky=tk.W, padx=(10, 0), pady=3)
         
-        # Separador
-        ttk.Separator(right_frame, orient=tk.HORIZONTAL).grid(row=1, column=0, sticky=(tk.W, tk.E), pady=10)
+        # Frame para seleccionar CPUs - más espacioso
+        cpu_frame = ttk.LabelFrame(right_frame, text=f"🔧 Seleccionar CPUs ({self.cpu_count} disponibles)", padding="10")
+        cpu_frame.grid(row=2, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 15))
         
-        # Frame para seleccionar CPUs
-        cpu_frame = ttk.LabelFrame(right_frame, text=f"Seleccionar CPUs ({self.cpu_count} disponibles)", padding="5")
-        cpu_frame.grid(row=2, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        
-        # Checkboxes para cada CPU
+        # Checkboxes para cada CPU - mejor organizados
         self.cpu_vars = []
         self.cpu_checkboxes = []
         
-        # Crear checkboxes en una cuadrícula
-        cols = 4 if self.cpu_count > 4 else self.cpu_count
+        # Crear checkboxes en una cuadrícula más espaciada
+        cols = min(6, max(2, self.cpu_count // 2))  # Mejor distribución basada en cantidad de CPUs
         for i in range(self.cpu_count):
             var = tk.BooleanVar()
             self.cpu_vars.append(var)
@@ -236,27 +242,29 @@ class AffinityManager:
             checkbox = ttk.Checkbutton(cpu_frame, text=f"CPU {i}", variable=var)
             row = i // cols
             col = i % cols
-            checkbox.grid(row=row, column=col, sticky=tk.W, padx=5, pady=2)
+            checkbox.grid(row=row, column=col, sticky=tk.W, padx=8, pady=5)
             self.cpu_checkboxes.append(checkbox)
         
-        # Botones de control
-        button_frame = ttk.Frame(right_frame)
-        button_frame.grid(row=3, column=0, pady=(10, 0), sticky=(tk.W, tk.E))
+        # Botones de control de CPUs - mejor organizados
+        cpu_button_frame = ttk.Frame(right_frame)
+        cpu_button_frame.grid(row=3, column=0, pady=10, sticky=(tk.W, tk.E))
+        cpu_button_frame.columnconfigure(0, weight=1)
+        cpu_button_frame.columnconfigure(1, weight=1)
         
-        ttk.Button(button_frame, text="Seleccionar Todas", 
-                  command=self.select_all_cpus).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(button_frame, text="Deseleccionar Todas", 
-                  command=self.deselect_all_cpus).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(cpu_button_frame, text="✅ Seleccionar Todas", 
+                  command=self.select_all_cpus).grid(row=0, column=0, padx=(0, 5), sticky=(tk.W, tk.E))
+        ttk.Button(cpu_button_frame, text="❌ Deseleccionar Todas", 
+                  command=self.deselect_all_cpus).grid(row=0, column=1, padx=(5, 0), sticky=(tk.W, tk.E))
         
-        # Botón aplicar cambios
-        self.apply_btn = ttk.Button(right_frame, text="Aplicar Afinidad", 
-                                   command=self.apply_affinity, state='disabled')
-        self.apply_btn.grid(row=4, column=0, pady=(10, 0), sticky=(tk.W, tk.E))
+        # Botones principales - más destacados
+        self.apply_btn = ttk.Button(right_frame, text="🚀 Aplicar Afinidad", 
+                                   command=self.apply_affinity, state='disabled',
+                                   style='Accent.TButton')
+        self.apply_btn.grid(row=4, column=0, pady=(15, 8), sticky=(tk.W, tk.E))
         
-        # Botón para crear tarea automatizada
-        self.create_task_btn = ttk.Button(right_frame, text="Crear Tarea Automatizada", 
+        self.create_task_btn = ttk.Button(right_frame, text="🔧 Crear Tarea Automatizada", 
                                          command=self.show_create_task_dialog, state='disabled')
-        self.create_task_btn.grid(row=5, column=0, pady=(5, 0), sticky=(tk.W, tk.E))
+        self.create_task_btn.grid(row=5, column=0, pady=(0, 10), sticky=(tk.W, tk.E))
         
         # Pestaña 2: Tareas Automatizadas
         self.setup_automated_tasks_tab()
@@ -503,63 +511,72 @@ class AffinityManager:
     def setup_automated_tasks_tab(self):
         """Configura la pestaña de tareas automatizadas"""
         tasks_frame = ttk.Frame(self.notebook)
-        self.notebook.add(tasks_frame, text="Tareas Automatizadas")
+        self.notebook.add(tasks_frame, text="⚡ Tareas Automatizadas")
         
         tasks_frame.columnconfigure(0, weight=1)
         tasks_frame.rowconfigure(1, weight=1)
         
-        # Frame superior - Controles
-        control_frame = ttk.LabelFrame(tasks_frame, text="Controles de Tareas", padding="5")
-        control_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
-        control_frame.columnconfigure(2, weight=1)
+        # Frame superior - Controles mejorados
+        control_frame = ttk.LabelFrame(tasks_frame, text="🎛️ Controles de Tareas", padding="10")
+        control_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 15))
+        control_frame.columnconfigure(0, weight=1)
         
-        ttk.Button(control_frame, text="Nueva Tarea", 
-                  command=self.show_create_task_dialog).grid(row=0, column=0, padx=(0, 5))
-        ttk.Button(control_frame, text="Editar Tarea", 
-                  command=self.edit_selected_task).grid(row=0, column=1, padx=(0, 5))
-        ttk.Button(control_frame, text="Eliminar Tarea", 
-                  command=self.delete_selected_task).grid(row=0, column=2, padx=(0, 5))
-        ttk.Button(control_frame, text="Probar Tarea", 
-                  command=self.test_selected_task).grid(row=0, column=3, padx=(0, 5))
-        ttk.Button(control_frame, text="Diagnóstico", 
-                  command=self.diagnose_tasks_system).grid(row=0, column=4, padx=(0, 5))
+        # Primera fila de botones
+        buttons_frame1 = ttk.Frame(control_frame)
+        buttons_frame1.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
         
-        # Estado del monitoreo de teclado
-        self.keyboard_status_label = ttk.Label(control_frame, text="Estado: Iniciando...", 
-                                              foreground='orange')
-        self.keyboard_status_label.grid(row=1, column=0, columnspan=4, pady=(5, 0))
+        ttk.Button(buttons_frame1, text="➕ Nueva Tarea", 
+                  command=self.show_create_task_dialog).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(buttons_frame1, text="✏️ Editar Tarea", 
+                  command=self.edit_selected_task).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(buttons_frame1, text="🗑️ Eliminar Tarea", 
+                  command=self.delete_selected_task).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(buttons_frame1, text="🧪 Probar Tarea", 
+                  command=self.test_selected_task).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(buttons_frame1, text="🔍 Diagnóstico", 
+                  command=self.diagnose_tasks_system).pack(side=tk.LEFT)
         
-        # Información sobre hotkeys globales
+        # Estado del monitoreo de teclado - más destacado
+        status_frame = ttk.Frame(control_frame)
+        status_frame.grid(row=1, column=0, pady=8, sticky=(tk.W, tk.E))
+        
+        ttk.Label(status_frame, text="🔘 Estado del Sistema:", font=('Arial', 9, 'bold')).pack(side=tk.LEFT)
+        self.keyboard_status_label = ttk.Label(status_frame, text="Iniciando...", 
+                                              foreground='orange', font=('Arial', 9, 'bold'))
+        self.keyboard_status_label.pack(side=tk.LEFT, padx=(8, 0))
+        
+        # Información sobre hotkeys globales - más visible
         info_label = ttk.Label(control_frame, 
                               text="💡 Los hotkeys funcionan globalmente (incluso en pantalla completa)", 
-                              font=('Arial', 8), foreground='blue')
-        info_label.grid(row=2, column=0, columnspan=4, pady=(5, 0))
+                              font=('Arial', 9, 'bold'), foreground='blue')
+        info_label.grid(row=2, column=0, pady=(5, 0))
         
-        # Frame central - Lista de tareas
-        list_frame = ttk.LabelFrame(tasks_frame, text="Tareas Configuradas", padding="5")
+        # Frame central - Lista de tareas mejorada
+        list_frame = ttk.LabelFrame(tasks_frame, text="📋 Tareas Configuradas", padding="8")
         list_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         list_frame.columnconfigure(0, weight=1)
         list_frame.rowconfigure(0, weight=1)
         
-        # Treeview para mostrar tareas
+        # Treeview para mostrar tareas - optimizado para ventana maximizada
         task_columns = ('Nombre', 'Proceso', 'Hotkey', 'Afinidad Alta', 'Afinidad Baja', 'Tipo Alerta', 'Estado')
-        self.tasks_tree = ttk.Treeview(list_frame, columns=task_columns, show='headings', height=15)
+        self.tasks_tree = ttk.Treeview(list_frame, columns=task_columns, show='headings', height=20)
         
-        # Configurar columnas de tareas
-        self.tasks_tree.heading('Nombre', text='Nombre de la Tarea')
-        self.tasks_tree.heading('Proceso', text='Proceso Objetivo')
-        self.tasks_tree.heading('Hotkey', text='Combinación de Teclas')
-        self.tasks_tree.heading('Afinidad Alta', text='Afinidad Alta')
-        self.tasks_tree.heading('Afinidad Baja', text='Afinidad Baja')
-        self.tasks_tree.heading('Tipo Alerta', text='Tipo de Alerta')
-        self.tasks_tree.heading('Estado', text='Estado')
+        # Configurar columnas de tareas con mejor proporción
+        self.tasks_tree.heading('Nombre', text='📝 Nombre de la Tarea')
+        self.tasks_tree.heading('Proceso', text='🎯 Proceso Objetivo')
+        self.tasks_tree.heading('Hotkey', text='⌨️ Combinación de Teclas')
+        self.tasks_tree.heading('Afinidad Alta', text='⬆️ Afinidad Alta')
+        self.tasks_tree.heading('Afinidad Baja', text='⬇️ Afinidad Baja')
+        self.tasks_tree.heading('Tipo Alerta', text='🔔 Tipo de Alerta')
+        self.tasks_tree.heading('Estado', text='📊 Estado')
         
-        self.tasks_tree.column('Nombre', width=130)
-        self.tasks_tree.column('Proceso', width=100)
-        self.tasks_tree.column('Hotkey', width=100)
-        self.tasks_tree.column('Afinidad Alta', width=80)
-        self.tasks_tree.column('Afinidad Baja', width=80)
-        self.tasks_tree.column('Tipo Alerta', width=80)
+        # Anchos optimizados para ventana maximizada
+        self.tasks_tree.column('Nombre', width=180, minwidth=120)
+        self.tasks_tree.column('Proceso', width=140, minwidth=100)
+        self.tasks_tree.column('Hotkey', width=140, minwidth=100)
+        self.tasks_tree.column('Afinidad Alta', width=120, minwidth=80)
+        self.tasks_tree.column('Afinidad Baja', width=120, minwidth=80)
+        self.tasks_tree.column('Tipo Alerta', width=110, minwidth=80)
         self.tasks_tree.column('Estado', width=60)
         
         self.tasks_tree.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
@@ -1094,7 +1111,7 @@ class AffinityManager:
     def setup_notifications_tab(self):
         """Configura la pestaña de configuración de notificaciones"""
         notif_frame = ttk.Frame(self.notebook)
-        self.notebook.add(notif_frame, text="Configuración de Notificaciones")
+        self.notebook.add(notif_frame, text="🔔 Configuración de Notificaciones")
         
         notif_frame.columnconfigure(0, weight=1)
         notif_frame.rowconfigure(0, weight=1)
