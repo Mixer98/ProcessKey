@@ -3,7 +3,7 @@
 Administrador de Afinidad de Procesos
 Software para gestionar la afinidad de CPU de procesos en Windows
 
-Autor: Usuario
+Autor: Mixer98
 Fecha: 9 de septiembre de 2025
 """
 
