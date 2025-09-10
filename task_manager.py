@@ -263,18 +263,31 @@ class TaskManager:
                         self.manager.show_notification(message)
                         
                         # Reproducir sonido si está configurado
-                        if task.get('custom_sound', {}).get('enabled', False):
-                            sound_file = task['custom_sound']['file']
+                        custom_sound = task.get('custom_sound', {})
+                        if custom_sound.get('enabled', False):
+                            sound_file = custom_sound.get('file', '')
+                            self.log_message(f"Intentando reproducir sonido: {sound_file}", "info")
+                            
                             if sound_file and os.path.exists(sound_file):
                                 try:
+                                    self.log_message(f"Archivo de sonido encontrado, reproduciendo...", "info")
                                     if sound_file.lower().endswith('.mp3'):
                                         pygame.mixer.music.load(sound_file)
                                         pygame.mixer.music.play()
+                                        self.log_message(f"Sonido MP3 reproducido correctamente", "success")
                                     else:
                                         sound = pygame.mixer.Sound(sound_file)
                                         sound.play()
+                                        self.log_message(f"Sonido WAV reproducido correctamente", "success")
                                 except Exception as e:
-                                    self.log_message(f"Error reproduciendo sonido: {str(e)}", "warning")
+                                    self.log_message(f"Error reproduciendo sonido: {str(e)}", "error")
+                            else:
+                                if not sound_file:
+                                    self.log_message(f"No se especificó archivo de sonido en la tarea", "warning")
+                                else:
+                                    self.log_message(f"Archivo de sonido no existe: {sound_file}", "warning")
+                        else:
+                            self.log_message(f"Sonido personalizado deshabilitado para esta tarea", "info")
                         
                         self.log_message(
                             f"Tarea ejecutada: {task['name']}, Proceso: {process_name}, "
@@ -403,7 +416,7 @@ class TaskDialog:
         self.process_var = tk.StringVar(value=self.task_data.get('process_name', ''))
         self.hotkey_key_count_var = tk.IntVar(value=2)  # Por defecto 2 teclas
         self.custom_sound_var = tk.BooleanVar(value=self.task_data.get('custom_sound', {}).get('enabled', False))
-        self.sound_file_var = tk.StringVar(value=self.task_data.get('sound_file', ''))
+        self.sound_file_var = tk.StringVar(value=self.task_data.get('custom_sound', {}).get('file', ''))
         
         current_row = 0
         
@@ -689,8 +702,10 @@ class TaskDialog:
                 'hotkey': hotkey,
                 'target_affinity': target_affinity,
                 'alerts': selected_alerts,
-                'custom_sound': {'enabled': self.custom_sound_var.get()},
-                'sound_file': self.sound_file_var.get()
+                'custom_sound': {
+                    'enabled': self.custom_sound_var.get(),
+                    'file': self.sound_file_var.get()
+                }
             }
             self.dialog.destroy()
             

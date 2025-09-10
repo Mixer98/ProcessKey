@@ -1,20 +1,18 @@
 {
-  "e287d17c-0cb4-4231-bb4e-bfdb58fcee38": {
+  "1e14c2b0-771e-4688-8bd5-d85d4e83e590": {
     "name": "Tarea para winamp.exe",
     "process_name": "winamp.exe",
-    "hotkey": "ctrl+alt+2",
+    "hotkey": "ctrl+alt+1",
     "target_affinity": [
       0
     ],
     "alerts": [
-      "notification",
-      "system_sound",
       "custom_sound",
       "log_message"
     ],
     "custom_sound": {
-      "enabled": false
-    },
-    "sound_file": ""
+      "enabled": true,
+      "file": "C:/Windows/Media/Windows Unlock.wav"
+    }
   }
 }
