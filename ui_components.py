@@ -218,7 +218,7 @@ class UIComponents:
                   )).pack(side=tk.LEFT, padx=(0, 8))
                   
         ttk.Button(buttons_frame, text="🗑️ Eliminar Tarea",
-                  command=lambda: manager.task_manager.delete_task(
+                  command=lambda: manager.task_manager.delete_task_with_confirmation(
                       manager.tasks_tree.selection()[0] if manager.tasks_tree.selection() else None
                   )).pack(side=tk.LEFT, padx=(0, 8))
                   
