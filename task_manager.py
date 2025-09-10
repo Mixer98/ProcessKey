@@ -788,4 +788,8 @@ class TaskDialog:
             print(f"Error en get_key_str: {e}")
             return str(key.keysym if hasattr(key, 'keysym') else key).lower()
 
+    def save_automated_tasks(self):
+        """Alias de save_tasks para compatibilidad"""
+        return self.save_tasks()
+
 
