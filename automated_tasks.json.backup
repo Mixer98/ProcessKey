@@ -1,8 +1,8 @@
 {
-  "75baac6e-f504-4914-a41b-f8c587faa88f": {
-    "name": "Tarea para Core Temp.exe",
-    "process_name": "Core Temp.exe",
-    "hotkey": "ctrl+alt+1",
+  "e287d17c-0cb4-4231-bb4e-bfdb58fcee38": {
+    "name": "Tarea para winamp.exe",
+    "process_name": "winamp.exe",
+    "hotkey": "ctrl+alt+2",
     "target_affinity": [
       0
     ],
