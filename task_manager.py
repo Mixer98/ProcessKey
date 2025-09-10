@@ -14,7 +14,9 @@ import winsound
 import win32gui
 import win32con
 from typing import Dict, Any
-from pynput import keyboard as pynput_keyboard
+import shutil
+import keyboard
+import traceback
 
 # Inicializar pygame para el manejo de sonidos
 pygame.mixer.init()
@@ -61,19 +63,23 @@ class TaskDialog:
         process_entry.grid(row=1, column=1, columnspan=2, sticky=(tk.W, tk.E), pady=5)
         
         # Hotkey
-        ttk.Label(frame, text="Tecla de acceso rápido:").grid(row=2, column=0, sticky=tk.W, pady=5)
+        ttk.Label(frame, text="Teclas de acceso rápido:").grid(row=2, column=0, sticky=tk.W, pady=5)
         hotkey_frame = ttk.Frame(frame)
         hotkey_frame.grid(row=2, column=1, columnspan=2, sticky=tk.W, pady=5)
-        
-        self.hotkey_var = tk.StringVar(value=self.task_data.get('hotkey', ''))
-        self.hotkey_entry = ttk.Entry(hotkey_frame, textvariable=self.hotkey_var, width=20, state='readonly')
-        self.hotkey_entry.pack(side=tk.LEFT, padx=(0, 5))
-        
-        self.capture_btn = ttk.Button(hotkey_frame, text="Capturar", command=self.start_hotkey_capture)
-        self.capture_btn.pack(side=tk.LEFT)
-        
-        ttk.Label(frame, text="(Haga clic en 'Capturar' y presione la combinación de teclas deseada)",
-                 font=('Arial', 8)).grid(row=3, column=1, columnspan=2, sticky=tk.W, pady=(0, 10))
+
+        # Selector de cantidad de teclas
+        ttk.Label(hotkey_frame, text="Cantidad de teclas:").pack(side=tk.LEFT)
+        self.num_keys_var = tk.IntVar(value=2)
+        num_keys_spin = ttk.Spinbox(hotkey_frame, from_=2, to=5, width=3, textvariable=self.num_keys_var, command=self.update_hotkey_fields, state='readonly')
+        num_keys_spin.pack(side=tk.LEFT, padx=(5, 10))
+
+        # Frame para los campos de teclas
+        self.keys_fields_frame = ttk.Frame(hotkey_frame)
+        self.keys_fields_frame.pack(side=tk.LEFT)
+        self.hotkey_entries = []
+        self.update_hotkey_fields()
+
+        ttk.Label(frame, text="(Presione cada tecla, una por campo. Ej: Ctrl, Alt, K)", font=('Arial', 8)).grid(row=3, column=1, columnspan=2, sticky=tk.W, pady=(0, 10))
         
         # Afinidad
         ttk.Label(frame, text="CPUs a utilizar:", font=('Arial', 9, 'bold')).grid(
@@ -137,7 +143,7 @@ class TaskDialog:
         sound_frame = ttk.LabelFrame(alert_section, text="🎵 Sonido Personalizado")
         sound_frame.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(10,5), padx=5)
         
-        self.custom_sound_var = tk.BooleanVar(value=False)
+        self.custom_sound_var = tk.BooleanVar(value=self.task_data.get('custom_sound', {}).get('enabled', False))
         ttk.Checkbutton(sound_frame, text="Usar sonido personalizado", 
                        variable=self.custom_sound_var).grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
                        
@@ -160,162 +166,46 @@ class TaskDialog:
         ttk.Button(button_frame, text="Guardar", command=self.validate_and_save).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Cancelar", command=self.dialog.destroy).pack(side=tk.LEFT, padx=5)
         
-    def start_hotkey_capture(self):
-        """Inicia la captura de teclas"""
-        if self.listening_for_hotkey:
-            self.stop_hotkey_capture()
-            return
-            
-        self.listening_for_hotkey = True
-        self.hotkey_entry.config(state='normal')
-        self.hotkey_var.set("Presione una combinación de teclas...")
-        self.hotkey_entry.config(state='readonly')
-        self.capture_btn.config(text="Cancelar")
-        
-        # Inicializar variables de captura
-        self.pressed_keys = set()
-        self.last_key_time = time.time()
-        
-        # Iniciar listener de teclado
-        self.keyboard_listener = pynput_keyboard.Listener(
-            on_press=self.on_key_press,
-            on_release=self.on_key_release)
-        self.keyboard_listener.start()
-        
-        # Programar detención automática después de 10 segundos si no se ha capturado nada
-        self.auto_stop_timer = self.dialog.after(10000, self.auto_stop_capture)
-    
-    def auto_stop_capture(self):
-        """Detiene automáticamente la captura si no hay actividad"""
-        if self.listening_for_hotkey:
-            current_time = time.time()
-            if not self.pressed_keys and (current_time - self.last_key_time) > 2:
-                self.stop_hotkey_capture()
-            else:
-                # Programar otra verificación en 2 segundos
-                self.auto_stop_timer = self.dialog.after(2000, self.auto_stop_capture)
-    
-    def stop_hotkey_capture(self):
-        """Detiene la captura de teclas"""
-        if hasattr(self, 'keyboard_listener'):
-            self.keyboard_listener.stop()
-            
-        if hasattr(self, 'auto_stop_timer'):
-            self.dialog.after_cancel(self.auto_stop_timer)
-            
-        self.listening_for_hotkey = False
-        self.capture_btn.config(text="Capturar")
-        
-        # Limpiar conjuntos de teclas
-        self.pressed_keys = set()
-        
-        # Si no hay combinación válida, restaurar el valor anterior
-        current_hotkey = self.hotkey_var.get()
-        if not current_hotkey or current_hotkey == "Presione una combinación de teclas...":
-            self.hotkey_var.set(self.task_data.get('hotkey', ''))
-    
-    def format_hotkey(self, keys):
-        """Formatea un conjunto de teclas en una cadena de hotkey"""
-        if not keys:
-            return ""
-            
-        # Ordenar las teclas: primero los modificadores, luego el resto
-        sorted_keys = sorted(keys, key=lambda x: (
-            0 if x in ['ctrl', 'alt', 'shift'] else 1,
-            x
-        ))
-        return "+".join(sorted_keys)
-    
-    def on_key_press(self, key):
-        """Maneja el evento de tecla presionada"""
-        try:
-            if not self.listening_for_hotkey:
-                return False
-                
-            key_str = self.get_key_str(key)
-            if not key_str:
-                return True
-            
-            # Registrar tiempo y agregar tecla
-            self.last_key_time = time.time()
-            self.pressed_keys.add(key_str)
-            
-            # Actualizar la visualización
-            self.update_hotkey_display()
-            
-            return True
-            
-        except Exception as e:
-            print(f"Error en on_key_press: {e}")
-            return False
-    
-    def on_key_release(self, key):
-        """Maneja el evento de tecla liberada"""
-        try:
-            if not self.listening_for_hotkey:
-                return False
-                
-            key_str = self.get_key_str(key)
-            if not key_str:
-                return True
-            
-            # Remover la tecla del conjunto de teclas presionadas
-            if key_str in self.pressed_keys:
-                self.pressed_keys.remove(key_str)
-            
-            # Si es una tecla no modificadora, marcar la combinación como completa
-            if key_str not in ['ctrl', 'alt', 'shift']:
-                self.combination_complete = True
-            
-            # Si ya no hay teclas presionadas y la combinación está completa
-            if not self.pressed_keys and self.combination_complete:
-                # Dejar un pequeño tiempo para asegurarnos de que todas las teclas se soltaron
-                self.dialog.after(500, self.finalize_combination)
-            
-            return True
-            
-        except Exception as e:
-            print(f"Error en on_key_release: {e}")
-            return False
-    
-    def update_hotkey_display(self):
-        """Actualiza la visualización del hotkey actual"""
-        hotkey = self.format_hotkey(self.pressed_keys)
-        self.hotkey_entry.config(state='normal')
-        self.hotkey_var.set(hotkey)
-        self.hotkey_entry.config(state='readonly')
-    
-    def finalize_combination(self):
-        """Finaliza la captura de la combinación actual"""
-        if not self.listening_for_hotkey:
-            return
-            
-        try:
-            # Convertir el conjunto de teclas en una combinación formateada
-            hotkey = self.format_hotkey(self.pressed_keys)
-            is_valid, error_msg = self.validate_hotkey(hotkey)
-            
-            if is_valid:
-                # Guardar la combinación y detener la captura
-                self.hotkey_entry.config(state='normal')
-                self.hotkey_var.set(hotkey)
-                self.hotkey_entry.config(state='readonly')
-                
-                # Programar la detención automática después de 2 segundos
-                self.dialog.after(2000, self.stop_hotkey_capture)
-            else:
-                # Limpiar y continuar capturando
-                self.pressed_keys.clear()
-                self.combination_complete = False
-                self.hotkey_entry.config(state='normal')
-                self.hotkey_var.set("Presione una combinación de teclas...")
-                self.hotkey_entry.config(state='readonly')
-                messagebox.showwarning("Combinación inválida", error_msg)
-                
-        except Exception as e:
-            print(f"Error al finalizar combinación: {e}")
-            self.stop_hotkey_capture()
-    
+    def update_hotkey_fields(self):
+        """Actualiza los campos de entrada de teclas según la cantidad seleccionada y activa la captura"""
+        for widget in self.keys_fields_frame.winfo_children():
+            widget.destroy()
+        self.hotkey_entries = []
+        for i in range(self.num_keys_var.get()):
+            entry = ttk.Entry(self.keys_fields_frame, width=8, justify='center', state='readonly')
+            entry.pack(side=tk.LEFT, padx=2)
+            entry.bind('<FocusIn>', lambda e, idx=i: self.start_key_capture(idx))
+            self.hotkey_entries.append(entry)
+        # Opcional: poner foco en el primer campo
+        self.hotkey_entries[0].config(state='normal')
+        self.hotkey_entries[0].focus_set()
+
+    def start_key_capture(self, idx):
+        """Activa la captura de una tecla para el campo idx"""
+        entry = self.hotkey_entries[idx]
+        entry.config(state='normal')
+        entry.delete(0, tk.END)
+        entry.bind('<KeyPress>', lambda event, i=idx: self.on_key_press(event, i))
+
+    def on_key_press(self, event, idx):
+        """Captura la tecla presionada y la pone en el campo correspondiente"""
+        key = event.keysym.title()
+        entry = self.hotkey_entries[idx]
+        entry.delete(0, tk.END)
+        entry.insert(0, key)
+        entry.config(state='readonly')
+        entry.unbind('<KeyPress>')
+        # Pasar foco al siguiente campo si existe
+        if idx + 1 < len(self.hotkey_entries):
+            self.hotkey_entries[idx + 1].config(state='normal')
+            self.hotkey_entries[idx + 1].focus_set()
+        # Si es el último, opcional: volver al primero o dejar así
+
+    def get_hotkey_combination(self):
+        """Obtiene la combinación de teclas desde los campos"""
+        keys = [e.get().strip() for e in self.hotkey_entries if e.get().strip()]
+        return '+'.join(keys)
+
     def browse_sound_file(self):
         """Permite al usuario seleccionar un archivo de sonido"""
         file_path = tk.filedialog.askopenfilename(
@@ -354,7 +244,7 @@ class TaskDialog:
         try:
             name = self.name_var.get().strip()
             process = self.process_var.get().strip()
-            hotkey = self.hotkey_var.get().strip()
+            hotkey = self.get_hotkey_combination()
             
             # Validaciones básicas
             if not all([name, process]):
@@ -364,7 +254,11 @@ class TaskDialog:
             # Validar hotkey
             is_valid, error_msg = self.validate_hotkey(hotkey)
             if not is_valid:
-                messagebox.showwarning("Error", error_msg)
+                messagebox.showerror("Error", error_msg or "Combinación de teclas inválida")
+                return
+            
+            if not hotkey:
+                messagebox.showwarning("Error", "Debe capturar una combinación de teclas")
                 return
             
             # Obtener CPUs seleccionadas
@@ -380,30 +274,21 @@ class TaskDialog:
                 messagebox.showwarning("Error", "Debe seleccionar al menos un tipo de alerta")
                 return
             
-            # Validar archivo de sonido si está habilitado
-            if self.custom_sound_var.get():
-                sound_file = self.sound_file_var.get()
-                if not sound_file or not os.path.exists(sound_file):
-                    messagebox.showwarning("Error", "Debe seleccionar un archivo de sonido válido")
-                    return
-            
-            # Crear resultado
+            # Guardar resultado
             self.result = {
                 'name': name,
                 'process_name': process,
                 'hotkey': hotkey,
                 'target_affinity': target_affinity,
                 'alerts': selected_alerts,
-                'custom_sound': {
-                    'enabled': self.custom_sound_var.get(),
-                    'file': self.sound_file_var.get() if self.custom_sound_var.get() else None
-                }
+                'custom_sound': {'enabled': self.custom_sound_var.get()},
+                'sound_file': self.sound_file_var.get()
             }
-            
             self.dialog.destroy()
             
         except Exception as e:
             messagebox.showerror("Error", f"Error al guardar la tarea: {str(e)}")
+            print(f"Error detallado: {traceback.format_exc()}")  # Para debugging
 
     def center_dialog(self):
         """Centra el diálogo en la pantalla"""
@@ -442,7 +327,7 @@ class TaskDialog:
         """Deselecciona todas las CPUs en el grupo de checkboxes"""
         for var in vars_list:
             var.set(False)
-
+    
     def get_key_str(self, key):
         """Convierte una tecla en su representación como string"""
         try:
@@ -486,10 +371,19 @@ class TaskDialog:
                 'right': '→',
             }
             
+            # Mapeo del teclado numérico
+            if hasattr(key, 'vk') and 96 <= key.vk <= 105:  # Teclas numéricas del teclado numérico
+                return str(key.vk - 96)
+            
+            # Mapeo de números normales
+            if key_name.isdigit():
+                return key_name
+                
             # Agregar teclas de función (F1-F24)
             key_mapping.update({f'f{i}': f'f{i}' for i in range(1, 25)})
             
             return key_mapping.get(key_name, key_name)
+            
         except Exception as e:
             print(f"Error en get_key_str: {e}")
             return None
@@ -499,31 +393,40 @@ class TaskDialog:
         if not hotkey:
             return False, "La combinación de teclas no puede estar vacía"
             
-        keys = set(hotkey.split("+"))
+        keys = [k.lower() for k in hotkey.split("+")]  # Convertir a minúsculas para comparar
         
         # Debe tener al menos un modificador (ctrl, alt, shift)
-        modifiers = {'ctrl', 'alt', 'shift'}
+        modifiers = ['ctrl', 'alt', 'shift', 'control']
         if not any(mod in keys for mod in modifiers):
             return False, "La combinación debe incluir al menos una tecla modificadora (Ctrl, Alt, Shift)"
             
         # Debe tener al menos una tecla no modificadora
-        if len(keys - modifiers) == 0:
+        non_modifiers = [k for k in keys if k not in modifiers]
+        if not non_modifiers:
             return False, "La combinación debe incluir al menos una tecla además de los modificadores"
         
         # No debe ser una combinación peligrosa o reservada
-        dangerous_combinations = {
-            {'ctrl', 'alt', 'delete'},
-            {'ctrl', 'alt', 'supr'},
-            {'ctrl', 'shift', 'escape'},
-            {'win'},
-            {'cmd'},
-        }
-        if any(dc.issubset(keys) for dc in dangerous_combinations):
-            return False, "Combinación de teclas reservada del sistema"
+        dangerous_combinations = [
+            ['ctrl', 'alt', 'delete'],
+            ['ctrl', 'alt', 'supr'],
+            ['ctrl', 'shift', 'escape'],
+            ['win'],
+            ['cmd'],
+        ]
+        
+        # Verificar combinaciones peligrosas
+        for dc in dangerous_combinations:
+            if all(k in keys for k in dc):
+                return False, "Combinación de teclas reservada del sistema"
+        
+        # Número máximo de teclas (modificadores + 3 teclas adicionales)
+        if len(keys) > 6:  # 3 modificadores posibles + 3 teclas adicionales
+            return False, "La combinación no puede tener más de 6 teclas en total"
             
         return True, ""
 
 class TaskManager:
+    """Gestor de tareas automatizadas"""
     def __init__(self, manager):
         self.manager = manager
         self.tasks_file = "automated_tasks.json"
@@ -539,36 +442,6 @@ class TaskManager:
         # Cargar tareas al iniciar
         self.load_automated_tasks()
     
-    def log_message(self, message: str, level: str = "info"):
-        """Sistema de logging temporal hasta que la UI esté lista"""
-        if hasattr(self.manager, 'log_text') and self.manager.log_text:
-            # Si la UI está lista, usar su sistema de logging
-            self.manager.log_message(message, level)
-        else:
-            # Si no, solo imprimir en consola
-            prefix = {
-                "error": "❌",
-                "warning": "⚠️",
-                "success": "✅",
-                "info": "ℹ️"
-            }.get(level, "ℹ️")
-            print(f"{prefix} {message}")
-    
-    def log_message(self, message: str, level: str = "info"):
-        """Sistema de logging temporal hasta que la UI esté lista"""
-        if hasattr(self.manager, 'log_text') and self.manager.log_text:
-            # Si la UI está lista, usar su sistema de logging
-            self.manager.log_message(message, level)
-        else:
-            # Si no, solo imprimir en consola
-            prefix = {
-                "error": "❌",
-                "warning": "⚠️",
-                "success": "✅",
-                "info": "ℹ️"
-            }.get(level, "ℹ️")
-            print(f"{prefix} {message}")
-        
     def load_automated_tasks(self):
         """Carga las tareas automatizadas desde el archivo"""
         try:
@@ -580,372 +453,194 @@ class TaskManager:
                 for task_id, task_data in self.automated_tasks.items():
                     self.setup_hotkey_listener(task_data['hotkey'], task_id)
                     
-                self.manager.log_message("Tareas automatizadas cargadas correctamente", "success")
+                self.log_message("Tareas automatizadas cargadas correctamente", "success")
             else:
-                self.manager.log_message("No se encontró archivo de tareas, se creará uno nuevo")
+                self.log_message("No se encontró archivo de tareas, se creará uno nuevo")
                 self.save_automated_tasks()
         except Exception as e:
-            self.manager.log_message(f"Error cargando tareas: {str(e)}", "error")
+            self.log_message(f"Error cargando tareas: {str(e)}", "error")
             self.automated_tasks = {}
-            
+
     def save_automated_tasks(self):
         """Guarda las tareas automatizadas en el archivo"""
         try:
             # Crear backup del archivo existente
             if os.path.exists(self.tasks_file):
-                backup_file = f"{self.tasks_file}.backup"
-                try:
-                    if os.path.exists(backup_file):
-                        os.remove(backup_file)
-                    os.rename(self.tasks_file, backup_file)
-                except Exception as e:
-                    self.manager.log_message(f"Error creando backup: {str(e)}", "warning")
+                backup_file = self.tasks_file + ".backup"
+                shutil.copy2(self.tasks_file, backup_file)
             
-            # Guardar nuevo archivo
+            # Guardar tareas
             with open(self.tasks_file, 'w', encoding='utf-8') as f:
-                json.dump(self.automated_tasks, f, indent=4)
+                json.dump(self.automated_tasks, f, indent=4, ensure_ascii=False)
                 
-            self.manager.log_message("Tareas guardadas correctamente", "success")
+            self.log_message("Tareas guardadas correctamente", "success")
         except Exception as e:
-            self.manager.log_message(f"Error guardando tareas: {str(e)}", "error")
-
-    def setup_hotkey_listener(self, hotkey: str, task_id: str):
-        """Configura un listener para una combinación de teclas usando pynput"""
-        try:
-            # Remover listener anterior si existe
-            if hotkey in self.hotkey_listeners:
-                self.remove_hotkey_listener(hotkey)
-            
-            # Convertir el hotkey string a una lista de teclas
-            keys = hotkey.lower().split('+')
-            required_keys = set(keys)
-            
-            # Clase para manejar el estado de las teclas
-            class HotkeyState:
-                def __init__(self):
-                    self.pressed_keys = set()
-                    self.suppress_next = False
-            
-            state = HotkeyState()
-            
-            def on_press(key):
-                try:
-                    # Convertir la tecla a string
-                    if hasattr(key, 'char'):
-                        key_str = key.char.lower()
-                    else:
-                        key_str = str(key).replace('Key.', '').lower()
-                    
-                    # Agregar la tecla al conjunto de teclas presionadas
-                    state.pressed_keys.add(key_str)
-                    
-                    # Verificar si todas las teclas requeridas están presionadas
-                    if required_keys.issubset(state.pressed_keys) and not state.suppress_next:
-                        state.suppress_next = True  # Evitar activaciones múltiples
-                        # Ejecutar la tarea en el hilo principal
-                        self.manager.root.after(0, lambda: self.execute_automated_task(task_id))
-                except:
-                    pass
-            
-            def on_release(key):
-                try:
-                    # Convertir la tecla a string
-                    if hasattr(key, 'char'):
-                        key_str = key.char.lower()
-                    else:
-                        key_str = str(key).replace('Key.', '').lower()
-                    
-                    # Remover la tecla del conjunto de teclas presionadas
-                    state.pressed_keys.discard(key_str)
-                    
-                    # Si todas las teclas fueron liberadas, permitir nueva activación
-                    if not state.pressed_keys:
-                        state.suppress_next = False
-                except:
-                    pass
-            
-            # Crear y guardar el listener
-            listener = pynput_keyboard.Listener(on_press=on_press, on_release=on_release)
-            listener.start()
-            self.hotkey_listeners[hotkey] = {
-                'listener': listener,
-                'task_id': task_id
-            }
-            
-            self.manager.log_message(f"Hotkey global configurado: {hotkey}", "success")
-            
-        except Exception as e:
-            self.manager.log_message(f"Error configurando hotkey {hotkey}: {str(e)}", "error")
-            
-    def remove_hotkey_listener(self, hotkey: str):
-        """Elimina un listener de hotkey"""
-        try:
-            if hotkey in self.hotkey_listeners:
-                self.hotkey_listeners[hotkey]['listener'].stop()
-                del self.hotkey_listeners[hotkey]
-        except Exception as e:
-            self.manager.log_message(f"Error removiendo hotkey {hotkey}: {str(e)}", "error")
-            
-    def execute_automated_task(self, task_id: str):
-        """Ejecuta una tarea automatizada"""
-        if task_id not in self.automated_tasks:
-            return
-            
-        task_data = self.automated_tasks[task_id]
-        
-        try:
-            # Buscar proceso por nombre
-            target_process = None
-            for proc in psutil.process_iter(['pid', 'name']):
-                if proc.info['name'].lower() == task_data['process_name'].lower():
-                    target_process = proc
-                    break
-                    
-            if not target_process:
-                self.manager.log_message(f"Proceso no encontrado: {task_data['process_name']}", "warning")
-                return
-                
-            # Aplicar la afinidad configurada
-            target_affinity = task_data.get('target_affinity', [0])  # Por defecto CPU0
-            target_process.cpu_affinity(target_affinity)
-            affinity_str = ', '.join([f"CPU{cpu}" for cpu in target_affinity])
-            
-            self.manager.log_message(
-                f"Tarea ejecutada: {task_data['name']} - {task_data['process_name']} "
-                f"→ CPUs asignadas: {affinity_str}", 
-                "success"
-            )
-            
-            # Mostrar notificación
-            self.manager._last_process_name = task_data['process_name']
-            
-            # Manejar cada tipo de alerta seleccionado
-            alerts = task_data.get('alerts', ['notification', 'sound'])  # Por compatibilidad
-            message = f"Afinidad aplicada a {task_data['process_name']}"
-            
-            if 'notification' in alerts:
-                self.manager.show_notification(message)
-            
-            if 'sound' in alerts:
-                # Verificar si hay sonido personalizado
-                if task_data.get('custom_sound', {}).get('enabled', False):
-                    sound_file = task_data['custom_sound']['file']
-                    if sound_file and os.path.exists(sound_file):
-                        try:
-                            if sound_file.lower().endswith('.mp3'):
-                                pygame.mixer.music.load(sound_file)
-                                pygame.mixer.music.play()
-                            else:
-                                sound = pygame.mixer.Sound(sound_file)
-                                sound.play()
-                        except Exception as e:
-                            self.manager.log_message(f"Error reproduciendo sonido: {str(e)}", "error")
-                            winsound.MessageBeep()  # Sonido por defecto como respaldo
-                    else:
-                        winsound.MessageBeep()
-                else:
-                    winsound.MessageBeep()
-            
-            if 'tray' in alerts:
-                # Mostrar icono en la bandeja del sistema
-                try:
-                    import win32gui
-                    import win32con
-                    hwnd = win32gui.FindWindow(None, "Administrador de Afinidad de Procesos")
-                    if hwnd:
-                        win32gui.Shell_NotifyIcon(win32con.NIM_MODIFY, 
-                            (hwnd, 0, win32con.NIF_INFO, win32con.WM_USER+20,
-                            0, "Afinidad Cambiada", message, 200, "Administrador de Afinidad"))
-                except:
-                    pass  # Si falla, ignoramos silenciosamente
-            
-            if 'flash' in alerts:
-                # Hacer parpadear la ventana
-                try:
-                    import win32gui
-                    import win32con
-                    hwnd = win32gui.FindWindow(None, "Administrador de Afinidad de Procesos")
-                    if hwnd and not win32gui.IsWindowVisible(hwnd):
-                        win32gui.FlashWindow(hwnd, True)
-                except:
-                    pass  # Si falla, ignoramos silenciosamente
-            
-            self.manager.log_message(
-                f"Tarea ejecutada: {task_data['name']} - Alertas: {', '.join(alerts)}", 
-                "success"
-            )
-            
-        except psutil.AccessDenied:
-            self.manager.log_message(f"Acceso denegado: {task_data['name']}", "error")
-        except Exception as e:
-            self.manager.log_message(f"Error en tarea {task_data['name']}: {str(e)}", "error")
-
-    def add_task(self, task_data: Dict[str, Any]) -> str:
+            self.log_message(f"Error guardando tareas: {str(e)}", "error")
+    
+    def log_message(self, message: str, level: str = "info"):
+        """Sistema de logging temporal hasta que la UI esté lista"""
+        if hasattr(self.manager, 'log_message'):
+            self.manager.log_message(message, level)
+        else:
+            prefix = {
+                "error": "❌",
+                "warning": "⚠️",
+                "success": "✅",
+                "info": "ℹ️"
+            }.get(level, "ℹ️")
+            print(f"{prefix} {message}")
+    
+    def add_task(self, task_data: Dict[str, Any]) -> bool:
         """Agrega una nueva tarea automatizada"""
         try:
+            # Generar ID único para la tarea
             task_id = str(uuid.uuid4())
             
-            # Asegurar que los datos son serializables
-            serializable_data = {
-                'name': str(task_data.get('name', '')),
-                'process_name': str(task_data.get('process_name', '')),
-                'hotkey': str(task_data.get('hotkey', '')),
-                'target_affinity': list(task_data.get('target_affinity', [])),
-                'alerts': list(task_data.get('alerts', ['notification', 'sound'])),
-                'custom_sound': {
-                    'enabled': bool(task_data.get('custom_sound', {}).get('enabled', False)),
-                    'file': str(task_data.get('custom_sound', {}).get('file', '')) or None
-                }
-            }
-            
-            self.automated_tasks[task_id] = serializable_data
+            # Agregar la tarea a la colección
+            self.automated_tasks[task_id] = task_data
             
             # Configurar hotkey
             self.setup_hotkey_listener(task_data['hotkey'], task_id)
             
             # Guardar cambios
             self.save_automated_tasks()
-            self.manager.log_message(
-                f"Tarea creada: {task_data['name']} - Hotkey: {task_data['hotkey']}", 
-                "success"
-            )
             
-            return task_id
+            self.log_message(f"Tarea '{task_data['name']}' agregada correctamente", "success")
+            return True
             
         except Exception as e:
-            self.manager.log_message(f"Error al crear la tarea: {str(e)}", "error")
-            raise
-
+            self.log_message(f"Error agregando tarea: {str(e)}", "error")
+            return False
+    
+    def update_task(self, task_id: str, task_data: Dict[str, Any]) -> bool:
+        """Actualiza una tarea existente"""
+        try:
+            if task_id not in self.automated_tasks:
+                self.log_message(f"Tarea {task_id} no encontrada", "error")
+                return False
+            
+            # Eliminar el hotkey anterior
+            old_hotkey = self.automated_tasks[task_id]['hotkey']
+            self.remove_hotkey_listener(old_hotkey)
+            
+            # Actualizar datos
+            self.automated_tasks[task_id] = task_data
+            
+            # Configurar nuevo hotkey
+            self.setup_hotkey_listener(task_data['hotkey'], task_id)
+            
+            # Guardar cambios
+            self.save_automated_tasks()
+            
+            self.log_message(f"Tarea '{task_data['name']}' actualizada correctamente", "success")
+            return True
+            
+        except Exception as e:
+            self.log_message(f"Error actualizando tarea: {str(e)}", "error")
+            return False
+    
     def delete_task(self, task_id: str) -> bool:
         """Elimina una tarea automatizada"""
         try:
-            if not task_id:
-                messagebox.showwarning("Advertencia", "Por favor, seleccione una tarea para eliminar")
-                return False
-                
             if task_id not in self.automated_tasks:
-                messagebox.showerror("Error", "Tarea no encontrada")
+                self.log_message(f"Tarea {task_id} no encontrada", "error")
                 return False
             
-            # Pedir confirmación
-            task_name = self.automated_tasks[task_id]['name']
-            if not messagebox.askyesno("Confirmar", f"¿Está seguro de eliminar la tarea '{task_name}'?"):
-                return False
-                
-            task_data = self.automated_tasks[task_id]
-            hotkey = task_data.get('hotkey')
+            # Eliminar hotkey
+            hotkey = self.automated_tasks[task_id]['hotkey']
+            self.remove_hotkey_listener(hotkey)
             
-            if hotkey:
-                self.remove_hotkey_listener(hotkey)
-                
+            # Eliminar tarea
             del self.automated_tasks[task_id]
+            
+            # Guardar cambios
             self.save_automated_tasks()
             
-            # Actualizar la vista
-            self.manager.ui.refresh_tasks_display(self.manager)
-            self.manager.log_message(f"Tarea eliminada: {task_name}", "success")
-            
+            self.log_message("Tarea eliminada correctamente", "success")
             return True
             
         except Exception as e:
-            self.manager.log_message(f"Error eliminando tarea: {str(e)}", "error")
-            messagebox.showerror("Error", f"Error al eliminar la tarea: {str(e)}")
+            self.log_message(f"Error eliminando tarea: {str(e)}", "error")
             return False
-
-    def edit_task(self, task_id: str, new_task_data: Dict[str, Any]) -> bool:
-        """Edita una tarea existente"""
+    
+    def setup_hotkey_listener(self, hotkey: str, task_id: str):
+        """Configura un listener para el hotkey de una tarea"""
+        try:
+            # Remover listener existente si lo hay
+            if hotkey in self.hotkey_listeners:
+                self.remove_hotkey_listener(hotkey)
+            
+            # Crear función de callback
+            def callback():
+                self.execute_task(task_id)
+            
+            # Registrar hotkey
+            keyboard.add_hotkey(hotkey, callback, suppress=True)
+            self.hotkey_listeners[hotkey] = callback
+            
+            self.log_message(f"Hotkey '{hotkey}' registrado correctamente", "success")
+            
+        except Exception as e:
+            self.log_message(f"Error configurando hotkey: {str(e)}", "error")
+    
+    def remove_hotkey_listener(self, hotkey: str):
+        """Elimina un listener de hotkey"""
+        try:
+            if hotkey in self.hotkey_listeners:
+                keyboard.remove_hotkey(hotkey)
+                del self.hotkey_listeners[hotkey]
+                self.log_message(f"Hotkey '{hotkey}' eliminado correctamente", "success")
+        except Exception as e:
+            self.log_message(f"Error eliminando hotkey: {str(e)}", "error")
+    
+    def execute_task(self, task_id: str):
+        """Ejecuta una tarea automatizada"""
         try:
             if task_id not in self.automated_tasks:
-                messagebox.showerror("Error", "La tarea no existe")
-                return False
-                
-            old_task = self.automated_tasks[task_id]
-            old_hotkey = old_task.get('hotkey')
+                self.log_message(f"Tarea {task_id} no encontrada", "error")
+                return
             
-            # Remover el listener anterior
-            if old_hotkey:
-                self.remove_hotkey_listener(old_hotkey)
+            task = self.automated_tasks[task_id]
+            process_name = task['process_name']
+            target_affinity = task['target_affinity']
             
-            # Actualizar la tarea
-            self.automated_tasks[task_id] = new_task_data
+            # Buscar el proceso por nombre
+            for proc in psutil.process_iter(['pid', 'name']):
+                try:
+                    if proc.info['name'].lower() == process_name.lower():
+                        # Aplicar afinidad
+                        proc.cpu_affinity(target_affinity)
+                        
+                        # Mostrar notificación
+                        cpu_list = ', '.join([f"CPU{cpu}" for cpu in target_affinity])
+                        message = f"Afinidad aplicada a {process_name}\nCPUs: {cpu_list}"
+                        self.manager.show_notification(message)
+                        
+                        # Reproducir sonido si está configurado
+                        if task.get('custom_sound', {}).get('enabled', False):
+                            sound_file = task['custom_sound']['file']
+                            if sound_file and os.path.exists(sound_file):
+                                try:
+                                    if sound_file.lower().endswith('.mp3'):
+                                        pygame.mixer.music.load(sound_file)
+                                        pygame.mixer.music.play()
+                                    else:
+                                        sound = pygame.mixer.Sound(sound_file)
+                                        sound.play()
+                                except Exception as e:
+                                    self.log_message(f"Error reproduciendo sonido: {str(e)}", "warning")
+                        
+                        self.log_message(
+                            f"Tarea ejecutada: {task['name']}, Proceso: {process_name}, "
+                            f"Afinidad: {cpu_list}",
+                            "success"
+                        )
+                        return
+                        
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    continue
             
-            # Configurar el nuevo hotkey
-            new_hotkey = new_task_data.get('hotkey')
-            if new_hotkey:
-                self.setup_hotkey_listener(new_hotkey, task_id)
-            
-            # Guardar los cambios
-            self.save_automated_tasks()
-            
-            # Actualizar la vista
-            self.manager.ui.refresh_tasks_display(self.manager)
-            
-            # Mostrar mensaje de éxito
-            self.manager.log_message(f"Tarea editada: {new_task_data['name']}", "success")
-            messagebox.showinfo("Éxito", f"La tarea '{new_task_data['name']}' ha sido actualizada")
-            
-            return True
+            self.log_message(f"Proceso {process_name} no encontrado", "warning")
             
         except Exception as e:
-            error_msg = f"Error editando tarea: {str(e)}"
-            self.manager.log_message(error_msg, "error")
-            messagebox.showerror("Error", error_msg)
-            return False
-
-    def show_notification_for_task(self, task_data: Dict[str, Any], mode: str):
-        """Muestra una notificación para una tarea"""
-        try:
-            alert_type = task_data.get('alert_type', 'combinado')
-            custom_config = task_data.get('custom_notification')
-            
-            if custom_config:
-                # Usar configuración personalizada
-                message = custom_config.get(f'message_{mode}', 
-                    "🚀 Afinidad ALTA aplicada" if mode == "high" else "💚 Afinidad BAJA aplicada")
-                
-                if custom_config.get('show_process_name', True):
-                    message = f"{message} - {task_data['process_name']}"
-                
-                if custom_config.get('sound_enabled', True):
-                    sound_file = custom_config.get('sound_file')
-                    if sound_file and os.path.exists(sound_file):
-                        self.play_notification_sound_custom(custom_config)
-                    else:
-                        winsound.MessageBeep()
-                
-                self.manager.show_notification(message, mode)
-            else:
-                # Usar configuración global
-                message = (self.manager.notification_config['message_high'] 
-                         if mode == "high" 
-                         else self.manager.notification_config['message_low'])
-                
-                if self.manager.notification_config['show_process_name']:
-                    message = f"{message} - {task_data['process_name']}"
-                    
-                self.manager.show_notification(message, mode)
-        
-        except Exception as e:
-            self.manager.log_message(f"Error en notificación: {str(e)}", "error")
-    
-    def edit_task_dialog(self, task_id: str):
-        """Muestra el diálogo para editar una tarea"""
-        if not task_id:
-            messagebox.showwarning("Advertencia", "Por favor, seleccione una tarea para editar")
-            return
-            
-        if task_id not in self.automated_tasks:
-            messagebox.showerror("Error", "Tarea no encontrada")
-            return
-            
-        task_data = self.automated_tasks[task_id].copy()
-        dialog = TaskDialog(self.manager.root, task_data, is_edit=True)
-        self.manager.root.wait_window(dialog.dialog)
-        
-        if dialog.result:
-            if self.edit_task(task_id, dialog.result):
-                self.manager.ui.refresh_tasks_display(self.manager)
-                self.manager.log_message(f"Tarea editada: {dialog.result['name']}", "success")
-            else:
-                messagebox.showerror("Error", "No se pudo editar la tarea")
-                self.manager.log_message("Error al editar la tarea", "error")
+            self.log_message(f"Error ejecutando tarea: {str(e)}", "error")
