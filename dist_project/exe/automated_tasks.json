@@ -1,0 +1,33 @@
+{
+  "2cac21db-9b7e-4b23-992a-9ad7c0438e20": {
+    "name": "Tarea para javaw.exe bajar afinidad",
+    "process_name": "javaw.exe",
+    "hotkey": "ctrl+alt+insert",
+    "target_affinity": [
+      0
+    ],
+    "alerts": [
+      "custom_sound"
+    ],
+    "custom_sound": {
+      "enabled": true,
+      "file": "C:/Windows/Media/tada.wav"
+    }
+  },
+  "b844b549-e65e-43f8-9b58-bd54312164f1": {
+    "name": "Tarea para javaw.exe",
+    "process_name": "javaw.exe",
+    "hotkey": "ctrl+alt+home",
+    "target_affinity": [
+      0,
+      1
+    ],
+    "alerts": [
+      "custom_sound"
+    ],
+    "custom_sound": {
+      "enabled": true,
+      "file": "C:/Windows/Media/Windows Unlock.wav"
+    }
+  }
+}

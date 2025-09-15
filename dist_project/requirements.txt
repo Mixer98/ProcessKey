@@ -1,0 +1,7 @@
+psutil>=5.9.0
+keyboard>=0.13.5
+pynput>=1.7.6
+pygame>=2.5.0
+numpy>=1.20.0
+pystray>=0.19.4
+pillow>=10.0.0
