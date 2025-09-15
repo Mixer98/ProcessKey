@@ -82,6 +82,7 @@ class UIComponents:
         # Configurar pestañas
         self.setup_manual_control_tab(manager)
         self.setup_tasks_tab(manager)  # Nueva pestaña de tareas
+        self.setup_hotkey_service_tab(manager)  # Nueva pestaña de servicio de hotkeys
 
     def setup_manual_control_tab(self, manager):
         """Configura la pestaña de control manual"""
@@ -332,3 +333,125 @@ class UIComponents:
                 alert_str,  # Tipos de alerta configurados
                 ""  # Columna extra para futura información
             ))
+        
+        # También actualizar la pestaña de hotkeys si está disponible
+        if hasattr(manager, 'refresh_hotkeys_display'):
+            manager.refresh_hotkeys_display()
+
+    def setup_hotkey_service_tab(self, manager):
+        """Configura la pestaña de administración del servicio de hotkeys"""
+        hotkey_frame = ttk.Frame(manager.notebook)
+        manager.notebook.add(hotkey_frame, text="⌨️ Servicio de Hotkeys")
+        
+        hotkey_frame.columnconfigure(0, weight=1)
+        hotkey_frame.rowconfigure(1, weight=1)
+        
+        # Frame superior - Estado del servicio y controles generales
+        service_frame = ttk.LabelFrame(hotkey_frame, text="🔧 Estado del Servicio", padding="15")
+        service_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 15))
+        service_frame.columnconfigure(0, weight=1)
+        
+        # Estado actual del servicio
+        status_frame = ttk.Frame(service_frame)
+        status_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 15))
+        status_frame.columnconfigure(1, weight=1)
+        
+        ttk.Label(status_frame, text="Estado del Servicio:", 
+                 font=('Arial', 12, 'bold')).grid(row=0, column=0, sticky=tk.W)
+        manager.service_status_label = ttk.Label(status_frame, text="🟢 Funcionando", 
+                                               foreground='green', font=('Arial', 12, 'bold'))
+        manager.service_status_label.grid(row=0, column=1, sticky=tk.W, padx=(10, 0))
+        
+        # Información del servicio
+        info_frame = ttk.Frame(service_frame)
+        info_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 15))
+        info_frame.columnconfigure(1, weight=1)
+        
+        # Labels informativos
+        info_labels = [
+            ("Hotkeys Activos:", "active_hotkeys_label", "0"),
+            ("Última Activación:", "last_activation_label", "Ninguna"),
+            ("Errores de Captura:", "capture_errors_label", "0"),
+        ]
+        
+        for row, (text, attr, default) in enumerate(info_labels):
+            ttk.Label(info_frame, text=text, font=('Arial', 10, 'bold')).grid(
+                row=row, column=0, sticky=tk.W, pady=2)
+            label = ttk.Label(info_frame, text=default, font=('Arial', 10))
+            label.grid(row=row, column=1, sticky=tk.W, padx=(10, 0), pady=2)
+            setattr(manager, attr, label)
+        
+        # Botones de control del servicio
+        buttons_frame = ttk.Frame(service_frame)
+        buttons_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=(10, 0))
+        
+        ttk.Button(buttons_frame, text="🔄 Reiniciar Servicio", 
+                  command=lambda: manager.restart_hotkey_service()).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(buttons_frame, text="⚠️ Detener Servicio", 
+                  command=lambda: manager.stop_hotkey_service()).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(buttons_frame, text="▶️ Iniciar Servicio", 
+                  command=lambda: manager.start_hotkey_service()).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(buttons_frame, text="🧪 Probar Captura", 
+                  command=lambda: manager.test_hotkey_capture()).pack(side=tk.LEFT)
+        
+        # Frame central - Lista de hotkeys activos
+        hotkeys_frame = ttk.LabelFrame(hotkey_frame, text="📋 Hotkeys Registrados", padding="8")
+        hotkeys_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        hotkeys_frame.columnconfigure(0, weight=1)
+        hotkeys_frame.rowconfigure(0, weight=1)
+        
+        # Treeview para mostrar hotkeys activos
+        hotkey_columns = ('Combinación', 'Tarea', 'Proceso', 'Estado', 'Última Activación', 'Contador')
+        manager.hotkeys_tree = ttk.Treeview(hotkeys_frame, columns=hotkey_columns, show='headings', height=15)
+        
+        # Configurar columnas
+        manager.hotkeys_tree.heading('Combinación', text='⌨️ Combinación de Teclas')
+        manager.hotkeys_tree.heading('Tarea', text='📝 Tarea Asociada')
+        manager.hotkeys_tree.heading('Proceso', text='🎯 Proceso Objetivo')
+        manager.hotkeys_tree.heading('Estado', text='📊 Estado')
+        manager.hotkeys_tree.heading('Última Activación', text='🕒 Última Activación')
+        manager.hotkeys_tree.heading('Contador', text='🔢 Veces Usado')
+        
+        # Anchos de columnas
+        manager.hotkeys_tree.column('Combinación', width=150, minwidth=100)
+        manager.hotkeys_tree.column('Tarea', width=200, minwidth=150)
+        manager.hotkeys_tree.column('Proceso', width=150, minwidth=100)
+        manager.hotkeys_tree.column('Estado', width=100, minwidth=80)
+        manager.hotkeys_tree.column('Última Activación', width=150, minwidth=120)
+        manager.hotkeys_tree.column('Contador', width=100, minwidth=80)
+        
+        manager.hotkeys_tree.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Scrollbar para hotkeys
+        hotkey_scrollbar = ttk.Scrollbar(hotkeys_frame, orient=tk.VERTICAL, command=manager.hotkeys_tree.yview)
+        hotkey_scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        manager.hotkeys_tree.configure(yscrollcommand=hotkey_scrollbar.set)
+        
+        # Frame inferior - Configuración avanzada
+        config_frame = ttk.LabelFrame(hotkey_frame, text="⚙️ Configuración Avanzada", padding="10")
+        config_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=(15, 0))
+        config_frame.columnconfigure(1, weight=1)
+        
+        # Configuraciones del servicio
+        ttk.Label(config_frame, text="Tiempo de espera entre capturas (ms):", 
+                 font=('Arial', 9, 'bold')).grid(row=0, column=0, sticky=tk.W, pady=5)
+        manager.capture_delay_var = tk.StringVar(value="100")
+        ttk.Entry(config_frame, textvariable=manager.capture_delay_var, width=10).grid(
+            row=0, column=1, sticky=tk.W, padx=(10, 0), pady=5)
+        
+        ttk.Label(config_frame, text="Modo de depuración:", 
+                 font=('Arial', 9, 'bold')).grid(row=1, column=0, sticky=tk.W, pady=5)
+        manager.debug_mode_var = tk.BooleanVar()
+        ttk.Checkbutton(config_frame, text="Mostrar información detallada", 
+                       variable=manager.debug_mode_var).grid(row=1, column=1, sticky=tk.W, padx=(10, 0), pady=5)
+        
+        # Botones de configuración
+        config_buttons_frame = ttk.Frame(config_frame)
+        config_buttons_frame.grid(row=2, column=0, columnspan=2, pady=(15, 0))
+        
+        ttk.Button(config_buttons_frame, text="💾 Guardar Configuración", 
+                  command=lambda: manager.save_hotkey_config()).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(config_buttons_frame, text="🔄 Cargar Configuración", 
+                  command=lambda: manager.load_hotkey_config()).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(config_buttons_frame, text="🏭 Restaurar Por Defecto", 
+                  command=lambda: manager.reset_hotkey_config()).pack(side=tk.LEFT)

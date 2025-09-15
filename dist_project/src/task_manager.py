@@ -28,6 +28,7 @@ class TaskManager:
         self.manager = manager
         self.automated_tasks = {}
         self.hotkey_listeners = {}
+        self.hotkey_stats = {}  # Estadísticas de uso de hotkeys
         self.tasks_file = "automated_tasks.json"
         self.load_tasks()
         
@@ -210,6 +211,14 @@ class TaskManager:
             def callback():
                 self.log_message(f"Hotkey '{normalized_hotkey}' activado - ejecutando tarea {task_id}", "info")
                 self.execute_task(task_id)
+                
+                # Actualizar estadísticas de uso de hotkey
+                if normalized_hotkey in self.hotkey_stats:
+                    self.hotkey_stats[normalized_hotkey]['count'] += 1
+                else:
+                    self.hotkey_stats[normalized_hotkey] = {'count': 1}
+                
+                self.log_message(f"Estadísticas de hotkey actualizadas: {self.hotkey_stats}", "info")
             
             # Registrar hotkey
             keyboard.add_hotkey(normalized_hotkey, callback, suppress=True)
@@ -231,6 +240,61 @@ class TaskManager:
         except Exception as e:
             self.log_message(f"Error eliminando hotkey: {str(e)}", "error")
     
+    def update_hotkey_stats(self, hotkey: str):
+        """Actualiza las estadísticas de uso de un hotkey"""
+        try:
+            current_time = time.strftime("%H:%M:%S")
+            
+            if hotkey not in self.hotkey_stats:
+                self.hotkey_stats[hotkey] = {
+                    'count': 0,
+                    'last_used': 'Nunca',
+                    'first_used': current_time
+                }
+            
+            # Actualizar estadísticas
+            self.hotkey_stats[hotkey]['count'] += 1
+            self.hotkey_stats[hotkey]['last_used'] = current_time
+            
+            # Actualizar la UI si está disponible
+            if hasattr(self.manager, 'last_activation_label'):
+                self.manager.last_activation_label.config(text=current_time)
+            
+            # Actualizar visualización de hotkeys
+            if hasattr(self.manager, 'refresh_hotkeys_display'):
+                self.manager.refresh_hotkeys_display()
+                
+        except Exception as e:
+            self.log_message(f"Error actualizando estadísticas de hotkey: {str(e)}", "error")
+    
+    def get_hotkey_stats(self, hotkey: str = None):
+        """Obtiene las estadísticas de un hotkey específico o todas"""
+        if hotkey:
+            return self.hotkey_stats.get(hotkey, {})
+        return self.hotkey_stats.copy()
+    
+    def reset_hotkey_stats(self, hotkey: str = None):
+        """Reinicia las estadísticas de un hotkey específico o todas"""
+        try:
+            if hotkey:
+                if hotkey in self.hotkey_stats:
+                    self.hotkey_stats[hotkey] = {
+                        'count': 0,
+                        'last_used': 'Nunca',
+                        'first_used': time.strftime("%H:%M:%S")
+                    }
+                    self.log_message(f"Estadísticas reiniciadas para hotkey: {hotkey}", "info")
+            else:
+                self.hotkey_stats.clear()
+                self.log_message("Todas las estadísticas de hotkeys reiniciadas", "info")
+                
+            # Actualizar visualización
+            if hasattr(self.manager, 'refresh_hotkeys_display'):
+                self.manager.refresh_hotkeys_display()
+                
+        except Exception as e:
+            self.log_message(f"Error reiniciando estadísticas: {str(e)}", "error")
+    
     def execute_task(self, task_id: str):
         """Ejecuta una tarea automatizada"""
         try:
@@ -243,6 +307,11 @@ class TaskManager:
             task = self.automated_tasks[task_id]
             process_name = task['process_name']
             target_affinity = task['target_affinity']
+            
+            # Actualizar estadísticas de uso del hotkey
+            hotkey = task.get('hotkey', '')
+            if hotkey:
+                self.update_hotkey_stats(hotkey)
             
             self.log_message(f"Buscando proceso: {process_name}", "info")
             

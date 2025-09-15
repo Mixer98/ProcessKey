@@ -100,6 +100,9 @@ class AffinityManager:
         
         # Configurar event handler para minimizar (opcional)
         self.root.bind('<Unmap>', self.on_window_state_change)
+        
+        # Inicializar la pestaña de hotkeys
+        self.initialize_hotkey_service_tab()
 
     def check_admin(self) -> bool:
         """Verifica si la aplicación se ejecuta con permisos de administrador"""
@@ -599,7 +602,258 @@ class AffinityManager:
                 # self.minimize_to_tray()
                 pass
 
-    # ...existing code...
+    def restart_hotkey_service(self):
+        """Reinicia el servicio de captura de hotkeys"""
+        try:
+            # Detener el servicio actual
+            self.stop_hotkey_service()
+            
+            # Esperar un momento
+            time.sleep(0.5)
+            
+            # Iniciar el servicio
+            self.start_hotkey_service()
+            
+            self.log_message("Servicio de hotkeys reiniciado", "success")
+            self.update_hotkey_service_status()
+            
+        except Exception as e:
+            self.log_message(f"Error reiniciando servicio de hotkeys: {str(e)}", "error")
+    
+    def stop_hotkey_service(self):
+        """Detiene el servicio de captura de hotkeys"""
+        try:
+            # Remover todos los listeners de hotkeys
+            for hotkey in list(self.task_manager.hotkey_listeners.keys()):
+                self.task_manager.remove_hotkey_listener(hotkey)
+            
+            # Actualizar estado en la UI
+            if hasattr(self, 'service_status_label'):
+                self.service_status_label.config(text="🔴 Detenido", foreground='red')
+            
+            self.log_message("Servicio de hotkeys detenido", "warning")
+            self.update_hotkey_service_status()
+            
+        except Exception as e:
+            self.log_message(f"Error deteniendo servicio de hotkeys: {str(e)}", "error")
+    
+    def start_hotkey_service(self):
+        """Inicia el servicio de captura de hotkeys"""
+        try:
+            # Reconfigurar todos los hotkeys de las tareas
+            for task_id, task in self.task_manager.automated_tasks.items():
+                if task.get('hotkey'):
+                    self.task_manager.setup_hotkey_listener(task['hotkey'], task_id)
+            
+            # Actualizar estado en la UI
+            if hasattr(self, 'service_status_label'):
+                self.service_status_label.config(text="🟢 Funcionando", foreground='green')
+            
+            self.log_message("Servicio de hotkeys iniciado", "success")
+            self.update_hotkey_service_status()
+            
+        except Exception as e:
+            self.log_message(f"Error iniciando servicio de hotkeys: {str(e)}", "error")
+    
+    def test_hotkey_capture(self):
+        """Prueba la captura de hotkeys mostrando un diálogo de test"""
+        try:
+            # Crear ventana de prueba
+            test_window = tk.Toplevel(self.root)
+            test_window.title("🧪 Prueba de Captura de Hotkeys")
+            test_window.geometry("500x300")
+            test_window.transient(self.root)
+            test_window.grab_set()
+            
+            # Centrar la ventana
+            test_window.geometry("+%d+%d" % (
+                self.root.winfo_rootx() + 100,
+                self.root.winfo_rooty() + 100
+            ))
+            
+            # Frame principal
+            main_frame = ttk.Frame(test_window, padding="20")
+            main_frame.pack(fill=tk.BOTH, expand=True)
+            
+            # Título
+            ttk.Label(main_frame, text="Prueba de Captura de Teclas",
+                     font=('Arial', 14, 'bold')).pack(pady=(0, 15))
+            
+            # Instrucciones
+            instructions = ttk.Label(main_frame, 
+                text="Presione cualquier combinación de teclas que desee probar.\n"
+                     "El sistema detectará automáticamente la combinación.",
+                font=('Arial', 10), justify=tk.CENTER)
+            instructions.pack(pady=(0, 20))
+            
+            # Area de resultado
+            result_frame = ttk.LabelFrame(main_frame, text="Resultado de la Captura", padding="10")
+            result_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 15))
+            
+            # Text widget para mostrar las capturas
+            capture_text = tk.Text(result_frame, height=8, font=('Consolas', 10))
+            capture_text.pack(fill=tk.BOTH, expand=True)
+            capture_text.insert(tk.END, "Esperando captura de teclas...\n")
+            
+            # Variable para controlar el test
+            test_active = [True]
+            
+            def on_key_event(e):
+                if test_active[0]:
+                    timestamp = time.strftime("%H:%M:%S")
+                    key_info = f"[{timestamp}] Capturado: {e.name}\n"
+                    capture_text.insert(tk.END, key_info)
+                    capture_text.see(tk.END)
+            
+            # Configurar listener temporal
+            test_hook = keyboard.on_press(on_key_event)
+            
+            def close_test():
+                test_active[0] = False
+                keyboard.unhook(test_hook)
+                test_window.destroy()
+            
+            # Botón de cerrar
+            ttk.Button(main_frame, text="Cerrar Prueba", 
+                      command=close_test).pack(pady=(10, 0))
+            
+            # Manejar cierre de ventana
+            test_window.protocol("WM_DELETE_WINDOW", close_test)
+            
+            self.log_message("Iniciada prueba de captura de hotkeys", "info")
+            
+        except Exception as e:
+            self.log_message(f"Error en prueba de captura: {str(e)}", "error")
+    
+    def update_hotkey_service_status(self):
+        """Actualiza el estado del servicio de hotkeys en la UI"""
+        try:
+            if hasattr(self, 'active_hotkeys_label'):
+                # Contar hotkeys activos
+                active_count = len(self.task_manager.hotkey_listeners)
+                self.active_hotkeys_label.config(text=str(active_count))
+            
+            if hasattr(self, 'hotkeys_tree'):
+                # Actualizar la lista de hotkeys
+                self.refresh_hotkeys_display()
+                
+        except Exception as e:
+            self.log_message(f"Error actualizando estado del servicio: {str(e)}", "error")
+    
+    def refresh_hotkeys_display(self):
+        """Actualiza la visualización de hotkeys en el treeview"""
+        try:
+            if not hasattr(self, 'hotkeys_tree'):
+                return
+                
+            # Limpiar treeview
+            for item in self.hotkeys_tree.get_children():
+                self.hotkeys_tree.delete(item)
+            
+            # Agregar hotkeys activos
+            for hotkey, task_id in self.task_manager.hotkey_listeners.items():
+                if task_id in self.task_manager.automated_tasks:
+                    task_data = self.task_manager.automated_tasks[task_id]
+                    
+                    # Obtener estadísticas del hotkey (si existen)
+                    stats = getattr(self.task_manager, 'hotkey_stats', {}).get(hotkey, {})
+                    last_used = stats.get('last_used', 'Nunca')
+                    usage_count = stats.get('count', 0)
+                    
+                    # Estado del hotkey
+                    status = "🟢 Activo" if hotkey in self.task_manager.hotkey_listeners else "🔴 Inactivo"
+                    
+                    self.hotkeys_tree.insert('', 'end', values=(
+                        hotkey,
+                        task_data.get('name', 'Sin nombre'),
+                        task_data.get('process_name', 'Sin proceso'),
+                        status,
+                        last_used,
+                        usage_count
+                    ))
+                    
+        except Exception as e:
+            self.log_message(f"Error actualizando visualización de hotkeys: {str(e)}", "error")
+    
+    def save_hotkey_config(self):
+        """Guarda la configuración del servicio de hotkeys"""
+        try:
+            config = {
+                'capture_delay': self.capture_delay_var.get() if hasattr(self, 'capture_delay_var') else "100",
+                'debug_mode': self.debug_mode_var.get() if hasattr(self, 'debug_mode_var') else False,
+                'service_enabled': True
+            }
+            
+            with open('hotkey_service_config.json', 'w', encoding='utf-8') as f:
+                json.dump(config, f, indent=2)
+            
+            self.log_message("Configuración de hotkeys guardada", "success")
+            
+        except Exception as e:
+            self.log_message(f"Error guardando configuración de hotkeys: {str(e)}", "error")
+    
+    def load_hotkey_config(self):
+        """Carga la configuración del servicio de hotkeys"""
+        try:
+            if os.path.exists('hotkey_service_config.json'):
+                with open('hotkey_service_config.json', 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                
+                # Aplicar configuración
+                if hasattr(self, 'capture_delay_var'):
+                    self.capture_delay_var.set(config.get('capture_delay', '100'))
+                if hasattr(self, 'debug_mode_var'):
+                    self.debug_mode_var.set(config.get('debug_mode', False))
+                
+                self.log_message("Configuración de hotkeys cargada", "success")
+            else:
+                self.log_message("No se encontró archivo de configuración de hotkeys", "warning")
+                
+        except Exception as e:
+            self.log_message(f"Error cargando configuración de hotkeys: {str(e)}", "error")
+    
+    def reset_hotkey_config(self):
+        """Restaura la configuración por defecto del servicio de hotkeys"""
+        try:
+            if hasattr(self, 'capture_delay_var'):
+                self.capture_delay_var.set("100")
+            if hasattr(self, 'debug_mode_var'):
+                self.debug_mode_var.set(False)
+            
+            self.log_message("Configuración de hotkeys restaurada por defecto", "success")
+            
+        except Exception as e:
+            self.log_message(f"Error restaurando configuración por defecto: {str(e)}", "error")
+
+    def initialize_hotkey_service_tab(self):
+        """Inicializa la pestaña de servicio de hotkeys con valores por defecto"""
+        try:
+            # Cargar configuración guardada
+            self.load_hotkey_config()
+            
+            # Actualizar estado del servicio
+            self.update_hotkey_service_status()
+            
+            # Configurar actualización periódica del estado
+            def update_service_status():
+                try:
+                    self.update_hotkey_service_status()
+                    if hasattr(self, 'capture_errors_label'):
+                        # Aquí podrías agregar lógica para contar errores reales
+                        self.capture_errors_label.config(text="0")
+                except:
+                    pass
+                # Programar próxima actualización en 5 segundos
+                self.root.after(5000, update_service_status)
+            
+            # Iniciar actualizaciones automáticas
+            self.root.after(1000, update_service_status)
+            
+            self.log_message("Pestaña de servicio de hotkeys inicializada", "success")
+            
+        except Exception as e:
+            self.log_message(f"Error inicializando pestaña de hotkeys: {str(e)}", "error")
+
 if __name__ == '__main__':
     root = tk.Tk()
     app = AffinityManager(root)
