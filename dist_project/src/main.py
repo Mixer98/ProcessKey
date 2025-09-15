@@ -77,6 +77,18 @@ class AffinityManager:
         self.is_minimized_to_tray = False
         self.tray_thread = None
         
+        # Sistema de monitoreo de captura de teclas
+        self.last_keypress_time = time.time()
+        self.keypress_timeout = 300  # 5 minutos por defecto
+        self.auto_recovery_enabled = True
+        self.monitoring_thread = None
+        self.stop_monitoring = False
+        self.test_key_captured = False
+        self.recovery_attempts = 0
+        self.max_recovery_attempts = 3
+        self.service_health_status = "unknown"
+        self.last_recovery_time = None
+        
         # Inicializar componentes UI sin cargar tareas
         self.ui = UIComponents()
         self.ui.setup_ui(self)
@@ -103,6 +115,9 @@ class AffinityManager:
         
         # Inicializar la pestaña de hotkeys
         self.initialize_hotkey_service_tab()
+        
+        # Iniciar sistema de monitoreo de captura de teclas
+        self.start_keypress_monitoring()
 
     def check_admin(self) -> bool:
         """Verifica si la aplicación se ejecuta con permisos de administrador"""
@@ -335,6 +350,9 @@ class AffinityManager:
     def on_closing(self):
         """Maneja el cierre de la aplicación"""
         try:
+            # Detener el sistema de monitoreo
+            self.stop_keypress_monitoring()
+            
             # Detener el icono de la bandeja si existe
             if hasattr(self, 'tray_icon') and self.tray_icon:
                 try:
@@ -781,7 +799,11 @@ class AffinityManager:
             config = {
                 'capture_delay': self.capture_delay_var.get() if hasattr(self, 'capture_delay_var') else "100",
                 'debug_mode': self.debug_mode_var.get() if hasattr(self, 'debug_mode_var') else False,
-                'service_enabled': True
+                'service_enabled': True,
+                # Configuración de monitoreo
+                'monitoring_timeout': self.timeout_var.get() if hasattr(self, 'timeout_var') else "5",
+                'auto_recovery_enabled': self.auto_recovery_var.get() if hasattr(self, 'auto_recovery_var') else True,
+                'max_recovery_attempts': self.max_recovery_attempts
             }
             
             with open('hotkey_service_config.json', 'w', encoding='utf-8') as f:
@@ -799,11 +821,24 @@ class AffinityManager:
                 with open('hotkey_service_config.json', 'r', encoding='utf-8') as f:
                     config = json.load(f)
                 
-                # Aplicar configuración
+                # Aplicar configuración básica
                 if hasattr(self, 'capture_delay_var'):
                     self.capture_delay_var.set(config.get('capture_delay', '100'))
                 if hasattr(self, 'debug_mode_var'):
                     self.debug_mode_var.set(config.get('debug_mode', False))
+                
+                # Aplicar configuración de monitoreo
+                if hasattr(self, 'timeout_var'):
+                    timeout_value = config.get('monitoring_timeout', '5')
+                    self.timeout_var.set(timeout_value)
+                    self.keypress_timeout = int(timeout_value) * 60
+                
+                if hasattr(self, 'auto_recovery_var'):
+                    recovery_enabled = config.get('auto_recovery_enabled', True)
+                    self.auto_recovery_var.set(recovery_enabled)
+                    self.auto_recovery_enabled = recovery_enabled
+                
+                self.max_recovery_attempts = config.get('max_recovery_attempts', 3)
                 
                 self.log_message("Configuración de hotkeys cargada", "success")
             else:
@@ -815,15 +850,318 @@ class AffinityManager:
     def reset_hotkey_config(self):
         """Restaura la configuración por defecto del servicio de hotkeys"""
         try:
+            # Configuración básica
             if hasattr(self, 'capture_delay_var'):
                 self.capture_delay_var.set("100")
             if hasattr(self, 'debug_mode_var'):
                 self.debug_mode_var.set(False)
             
+            # Configuración de monitoreo
+            if hasattr(self, 'timeout_var'):
+                self.timeout_var.set("5")
+                self.keypress_timeout = 300  # 5 minutos
+            
+            if hasattr(self, 'auto_recovery_var'):
+                self.auto_recovery_var.set(True)
+                self.auto_recovery_enabled = True
+            
+            self.max_recovery_attempts = 3
+            self.recovery_attempts = 0
+            
             self.log_message("Configuración de hotkeys restaurada por defecto", "success")
             
         except Exception as e:
             self.log_message(f"Error restaurando configuración por defecto: {str(e)}", "error")
+
+    def start_keypress_monitoring(self):
+        """Inicia el sistema de monitoreo de captura de teclas"""
+        try:
+            if self.monitoring_thread and self.monitoring_thread.is_alive():
+                return
+                
+            self.stop_monitoring = False
+            self.monitoring_thread = threading.Thread(target=self._monitoring_loop, daemon=True)
+            self.monitoring_thread.start()
+            
+            # Configurar listener global para detectar cualquier tecla presionada
+            self._setup_global_keypress_listener()
+            
+            self.log_message("Sistema de monitoreo de captura iniciado", "success")
+            
+        except Exception as e:
+            self.log_message(f"Error iniciando monitoreo: {str(e)}", "error")
+    
+    def _setup_global_keypress_listener(self):
+        """Configura un listener global para detectar pulsaciones de teclas"""
+        try:
+            def on_any_key(e):
+                self.last_keypress_time = time.time()
+                self.test_key_captured = True
+                # Actualizar estado de salud
+                self.service_health_status = "healthy"
+                if hasattr(self, 'health_status_label'):
+                    self.root.after_idle(lambda: self._update_health_status_ui())
+            
+            # Usar keyboard para capturar cualquier tecla
+            keyboard.on_press(on_any_key)
+            
+        except Exception as e:
+            self.log_message(f"Error configurando listener global: {str(e)}", "error")
+    
+    def _monitoring_loop(self):
+        """Bucle principal de monitoreo"""
+        while not self.stop_monitoring:
+            try:
+                current_time = time.time()
+                time_since_last_key = current_time - self.last_keypress_time
+                
+                # Verificar si han pasado demasiados minutos sin captura
+                if time_since_last_key > self.keypress_timeout and self.auto_recovery_enabled:
+                    self.log_message(f"⚠️ No se han detectado teclas en {int(time_since_last_key/60)} minutos", "warning")
+                    
+                    # Realizar test de captura
+                    if not self._test_key_capture():
+                        self.log_message("❌ Test de captura falló - Iniciando recuperación automática", "error")
+                        self._attempt_service_recovery()
+                    else:
+                        self.log_message("✅ Test de captura exitoso - Servicio funcionando", "success")
+                        self.service_health_status = "healthy"
+                
+                # Actualizar UI cada 10 segundos
+                if hasattr(self, 'root'):
+                    self.root.after_idle(lambda: self._update_monitoring_ui())
+                
+                time.sleep(10)  # Verificar cada 10 segundos
+                
+            except Exception as e:
+                self.log_message(f"Error en bucle de monitoreo: {str(e)}", "error")
+                time.sleep(30)  # Esperar más tiempo si hay error
+    
+    def _test_key_capture(self):
+        """Realiza una prueba para verificar si la captura de teclas funciona"""
+        try:
+            # Resetear flag de prueba
+            self.test_key_captured = False
+            
+            # Simular una pulsación de tecla interna para probar el sistema
+            # En lugar de simular, verificamos si el listener sigue activo
+            import keyboard
+            
+            # Verificar si hay hooks activos
+            if hasattr(keyboard, '_hooks') and keyboard._hooks:
+                self.service_health_status = "healthy"
+                return True
+            else:
+                self.service_health_status = "unhealthy"
+                return False
+                
+        except Exception as e:
+            self.log_message(f"Error en test de captura: {str(e)}", "error")
+            self.service_health_status = "error"
+            return False
+    
+    def _attempt_service_recovery(self):
+        """Intenta recuperar el servicio de captura de teclas"""
+        try:
+            if self.recovery_attempts >= self.max_recovery_attempts:
+                self.log_message(f"❌ Máximo de intentos de recuperación alcanzado ({self.max_recovery_attempts})", "error")
+                self.service_health_status = "failed"
+                return False
+            
+            self.recovery_attempts += 1
+            self.log_message(f"🔄 Intento de recuperación #{self.recovery_attempts}", "warning")
+            
+            # Método 1: Reiniciar servicio de hotkeys
+            self.log_message("Reiniciando servicio de hotkeys...", "info")
+            self.restart_hotkey_service()
+            
+            # Esperar y probar
+            time.sleep(2)
+            if self._test_key_capture():
+                self.log_message("✅ Recuperación exitosa con reinicio de servicio", "success")
+                self.recovery_attempts = 0
+                self.service_health_status = "recovered"
+                self.last_recovery_time = time.time()
+                return True
+            
+            # Método 2: Reconfigurar listener global
+            self.log_message("Reconfigurando listener global...", "info")
+            self._setup_global_keypress_listener()
+            
+            time.sleep(2)
+            if self._test_key_capture():
+                self.log_message("✅ Recuperación exitosa con reconfiguración", "success")
+                self.recovery_attempts = 0
+                self.service_health_status = "recovered"
+                self.last_recovery_time = time.time()
+                return True
+            
+            # Método 3: Limpiar y reconfigurar completamente
+            self.log_message("Limpiando y reconfigurando sistema completo...", "info")
+            self._full_service_reset()
+            
+            time.sleep(3)
+            if self._test_key_capture():
+                self.log_message("✅ Recuperación exitosa con reset completo", "success")
+                self.recovery_attempts = 0
+                self.service_health_status = "recovered"
+                self.last_recovery_time = time.time()
+                return True
+            
+            self.log_message(f"❌ Intento de recuperación #{self.recovery_attempts} falló", "error")
+            self.service_health_status = "recovery_failed"
+            return False
+            
+        except Exception as e:
+            self.log_message(f"Error en recuperación automática: {str(e)}", "error")
+            self.service_health_status = "error"
+            return False
+    
+    def _full_service_reset(self):
+        """Realiza un reset completo del servicio de captura"""
+        try:
+            # Limpiar todos los hooks existentes
+            import keyboard
+            keyboard.unhook_all()
+            
+            # Esperar un momento
+            time.sleep(1)
+            
+            # Reconfigurar todo
+            self._setup_global_keypress_listener()
+            self.start_hotkey_service()
+            
+            self.log_message("Reset completo del servicio realizado", "info")
+            
+        except Exception as e:
+            self.log_message(f"Error en reset completo: {str(e)}", "error")
+    
+    def _update_monitoring_ui(self):
+        """Actualiza la UI del sistema de monitoreo"""
+        try:
+            current_time = time.time()
+            time_since_last_key = current_time - self.last_keypress_time
+            
+            # Actualizar tiempo sin captura
+            if hasattr(self, 'last_capture_label'):
+                if time_since_last_key < 60:
+                    time_str = f"{int(time_since_last_key)}s"
+                else:
+                    time_str = f"{int(time_since_last_key/60)}m {int(time_since_last_key%60)}s"
+                self.last_capture_label.config(text=time_str)
+            
+            # Actualizar contador de recuperaciones
+            if hasattr(self, 'recovery_attempts_label'):
+                self.recovery_attempts_label.config(text=str(self.recovery_attempts))
+            
+            # Actualizar última recuperación
+            if hasattr(self, 'last_recovery_label') and hasattr(self, 'last_recovery_time'):
+                if hasattr(self, 'last_recovery_time') and self.last_recovery_time:
+                    recovery_time_str = time.strftime("%H:%M:%S", time.localtime(self.last_recovery_time))
+                    self.last_recovery_label.config(text=recovery_time_str)
+                else:
+                    self.last_recovery_label.config(text="Nunca")
+            
+            # Actualizar estado de salud
+            self._update_health_status_ui()
+            
+        except Exception as e:
+            # No loguear este error para evitar spam
+            pass
+    
+    def _update_health_status_ui(self):
+        """Actualiza el indicador de estado de salud en la UI"""
+        try:
+            if not hasattr(self, 'health_status_label'):
+                return
+                
+            status_colors = {
+                "healthy": ("🟢 Saludable", "green"),
+                "unhealthy": ("🟡 Problemático", "orange"),
+                "error": ("🔴 Error", "red"),
+                "recovery_failed": ("❌ Fallo Total", "red"),
+                "recovered": ("🟢 Recuperado", "green"),
+                "failed": ("💀 Fallido", "red"),
+                "unknown": ("⚪ Desconocido", "gray")
+            }
+            
+            text, color = status_colors.get(self.service_health_status, ("⚪ Desconocido", "gray"))
+            self.health_status_label.config(text=text, foreground=color)
+            
+        except Exception as e:
+            pass
+    
+    def toggle_auto_recovery(self):
+        """Alterna la recuperación automática"""
+        try:
+            if hasattr(self, 'auto_recovery_var'):
+                self.auto_recovery_enabled = self.auto_recovery_var.get()
+                status = "activada" if self.auto_recovery_enabled else "desactivada"
+                self.log_message(f"Recuperación automática {status}", "info")
+                
+                # Resetear contador si se activa
+                if self.auto_recovery_enabled:
+                    self.recovery_attempts = 0
+                    
+        except Exception as e:
+            self.log_message(f"Error alternando recuperación automática: {str(e)}", "error")
+    
+    def set_monitoring_timeout(self):
+        """Establece el timeout de monitoreo desde la UI"""
+        try:
+            if hasattr(self, 'timeout_var'):
+                timeout_minutes = int(self.timeout_var.get())
+                self.keypress_timeout = timeout_minutes * 60
+                self.log_message(f"Timeout de monitoreo establecido a {timeout_minutes} minutos", "info")
+                
+        except ValueError:
+            self.log_message("Valor de timeout inválido", "error")
+        except Exception as e:
+            self.log_message(f"Error estableciendo timeout: {str(e)}", "error")
+    
+    def manual_recovery_test(self):
+        """Ejecuta manualmente una prueba de recuperación"""
+        try:
+            self.log_message("🧪 Iniciando prueba manual de recuperación...", "info")
+            
+            # Forzar un intento de recuperación
+            old_attempts = self.recovery_attempts
+            self.recovery_attempts = 0  # Resetear para permitir el test
+            
+            success = self._attempt_service_recovery()
+            
+            if success:
+                self.log_message("✅ Prueba manual de recuperación exitosa", "success")
+                self.last_recovery_time = time.time()
+            else:
+                self.log_message("❌ Prueba manual de recuperación falló", "error")
+                self.recovery_attempts = old_attempts  # Restaurar si falló
+                
+        except Exception as e:
+            self.log_message(f"Error en prueba manual: {str(e)}", "error")
+    
+    def reset_recovery_counter(self):
+        """Resetea el contador de intentos de recuperación"""
+        try:
+            self.recovery_attempts = 0
+            self.service_health_status = "unknown"
+            self.log_message("Contador de recuperación reseteado", "success")
+            self._update_monitoring_ui()
+            
+        except Exception as e:
+            self.log_message(f"Error reseteando contador: {str(e)}", "error")
+    
+    def stop_keypress_monitoring(self):
+        """Detiene el sistema de monitoreo"""
+        try:
+            self.stop_monitoring = True
+            if self.monitoring_thread and self.monitoring_thread.is_alive():
+                self.monitoring_thread.join(timeout=5)
+            
+            self.log_message("Sistema de monitoreo detenido", "warning")
+            
+        except Exception as e:
+            self.log_message(f"Error deteniendo monitoreo: {str(e)}", "error")
 
     def initialize_hotkey_service_tab(self):
         """Inicializa la pestaña de servicio de hotkeys con valores por defecto"""

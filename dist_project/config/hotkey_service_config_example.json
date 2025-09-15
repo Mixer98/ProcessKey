@@ -1,0 +1,8 @@
+{
+  "capture_delay": "100",
+  "debug_mode": false,
+  "service_enabled": true,
+  "monitoring_timeout": "5",
+  "auto_recovery_enabled": true,
+  "max_recovery_attempts": 3
+}

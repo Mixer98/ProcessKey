@@ -31,23 +31,5 @@
       "enabled": true,
       "file": "C:/Windows/Media/Windows Critical Stop.wav"
     }
-  },
-  "532dd0a5-6bec-4bfb-8464-6169d4ecc113": {
-    "name": "Tarea para Core Temp.exe",
-    "process_name": "Core Temp.exe",
-    "hotkey": "z+x",
-    "target_affinity": [
-      0
-    ],
-    "alerts": [
-      "notification",
-      "system_sound",
-      "custom_sound",
-      "log_message"
-    ],
-    "custom_sound": {
-      "enabled": false,
-      "file": ""
-    }
   }
 }
