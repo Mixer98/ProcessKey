@@ -6,6 +6,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 import psutil
 import time
+from icon_utils import icon_manager, create_labeled_button, create_labeled_label
 
 class UIComponents:
     def setup_ui(self, manager):
@@ -32,8 +33,15 @@ class UIComponents:
         main_frame.rowconfigure(1, weight=1)
         
         # Título
-        title_label = ttk.Label(main_frame, text="🖥️ Administrador de Afinidad de Procesos", 
-                               font=('Arial', 18, 'bold'))
+        desktop_icon = icon_manager.get_icon_for_emoji("🖥️", (24, 24))
+        if desktop_icon:
+            title_label = ttk.Label(main_frame, text="Administrador de Afinidad de Procesos", 
+                                   image=desktop_icon, compound="left",
+                                   font=('Arial', 18, 'bold'))
+            title_label.image = desktop_icon
+        else:
+            title_label = ttk.Label(main_frame, text="🖥️ Administrador de Afinidad de Procesos", 
+                                   font=('Arial', 18, 'bold'))
         title_label.grid(row=0, column=0, columnspan=2, pady=(0, 15), sticky=(tk.W, tk.E))
         
         # Advertencia de permisos
@@ -41,9 +49,17 @@ class UIComponents:
             warning_frame = ttk.Frame(main_frame)
             warning_frame.grid(row=0, column=0, columnspan=2, pady=(35, 15), sticky=(tk.W, tk.E))
             
-            warning_label = ttk.Label(warning_frame, 
-                                    text="⚠️ Ejecute como administrador para modificar la afinidad de todos los procesos",
-                                    foreground='red', font=('Arial', 10, 'bold'))
+            warning_icon = icon_manager.get_icon_for_emoji("⚠️", (16, 16))
+            if warning_icon:
+                warning_label = ttk.Label(warning_frame, 
+                                        text="Ejecute como administrador para modificar la afinidad de todos los procesos",
+                                        image=warning_icon, compound="left",
+                                        foreground='red', font=('Arial', 10, 'bold'))
+                warning_label.image = warning_icon
+            else:
+                warning_label = ttk.Label(warning_frame, 
+                                        text="⚠️ Ejecute como administrador para modificar la afinidad de todos los procesos",
+                                        foreground='red', font=('Arial', 10, 'bold'))
             warning_label.pack()
         
         # Crear notebook
@@ -51,7 +67,11 @@ class UIComponents:
         manager.notebook.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 15))
 
         # Frame log
-        log_frame = ttk.LabelFrame(main_frame, text="📝 Registro de Actividad", padding="8")
+        memo_icon = icon_manager.get_icon_for_emoji("📝", (16, 16))
+        if memo_icon:
+            log_frame = ttk.LabelFrame(main_frame, text="Registro de Actividad", padding="8")
+        else:
+            log_frame = ttk.LabelFrame(main_frame, text="📝 Registro de Actividad", padding="8")
         log_frame.grid(row=1, column=1, sticky=(tk.W, tk.E, tk.N, tk.S))
         log_frame.rowconfigure(1, weight=1)
         log_frame.columnconfigure(0, weight=1)
@@ -61,18 +81,18 @@ class UIComponents:
         log_buttons_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 8))
         
         # Botones de control del log
-        ttk.Button(log_buttons_frame, text="🗑️ Limpiar Log", 
-                  command=lambda: manager.clear_log()).pack(side=tk.LEFT, padx=(0, 5))
+        create_labeled_button(log_buttons_frame, "🗑️ Limpiar Log", 
+                            command=lambda: manager.clear_log()).pack(side=tk.LEFT, padx=(0, 5))
         
         # Variable para controlar visibilidad del log
         manager.log_visible = tk.BooleanVar(value=True)
-        manager.toggle_log_btn = ttk.Button(log_buttons_frame, text="👁️ Ocultar Log", 
-                                          command=lambda: manager.toggle_log_visibility())
+        manager.toggle_log_btn = create_labeled_button(log_buttons_frame, "👁️ Ocultar Log", 
+                                                      command=lambda: manager.toggle_log_visibility())
         manager.toggle_log_btn.pack(side=tk.LEFT, padx=(0, 5))
         
         # Botón para minimizar a la bandeja
-        ttk.Button(log_buttons_frame, text="📌 A Bandeja", 
-                  command=lambda: manager.smart_minimize()).pack(side=tk.LEFT)
+        create_labeled_button(log_buttons_frame, "📌 A Bandeja", 
+                            command=lambda: manager.smart_minimize()).pack(side=tk.LEFT)
         
         # Log de actividad
         manager.log_text = scrolledtext.ScrolledText(log_frame, height=25, state='disabled', 
@@ -87,14 +107,25 @@ class UIComponents:
     def setup_manual_control_tab(self, manager):
         """Configura la pestaña de control manual"""
         manual_frame = ttk.Frame(manager.notebook)
-        manager.notebook.add(manual_frame, text="🎯 Control Manual")
+        
+        # Agregar pestaña con icono si está disponible
+        target_icon = icon_manager.get_icon_for_emoji("🎯", (16, 16))
+        if target_icon:
+            # tkinter no soporta iconos en pestañas directamente, usar texto
+            manager.notebook.add(manual_frame, text="Control Manual")
+        else:
+            manager.notebook.add(manual_frame, text="🎯 Control Manual")
         
         manual_frame.columnconfigure(0, weight=2, minsize=500)
         manual_frame.columnconfigure(1, weight=1, minsize=350)
         manual_frame.rowconfigure(0, weight=1)
         
         # Frame lista de procesos
-        left_frame = ttk.LabelFrame(manual_frame, text="📋 Procesos en Ejecución", padding="8")
+        clipboard_icon = icon_manager.get_icon_for_emoji("📋", (16, 16))
+        if clipboard_icon:
+            left_frame = ttk.LabelFrame(manual_frame, text="Procesos en Ejecución", padding="8")
+        else:
+            left_frame = ttk.LabelFrame(manual_frame, text="📋 Procesos en Ejecución", padding="8")
         left_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 10))
         left_frame.rowconfigure(1, weight=1)
         left_frame.columnconfigure(0, weight=1)
@@ -146,13 +177,21 @@ class UIComponents:
 
     def setup_affinity_control_frame(self, manager, parent_frame):
         """Configura el frame de control de afinidad"""
-        right_frame = ttk.LabelFrame(parent_frame, text="⚙️ Control de Afinidad de CPU", padding="8")
+        gear_icon = icon_manager.get_icon_for_emoji("⚙️", (16, 16))
+        if gear_icon:
+            right_frame = ttk.LabelFrame(parent_frame, text="Control de Afinidad de CPU", padding="8")
+        else:
+            right_frame = ttk.LabelFrame(parent_frame, text="⚙️ Control de Afinidad de CPU", padding="8")
         right_frame.grid(row=0, column=1, sticky=(tk.W, tk.E, tk.N, tk.S))
         right_frame.rowconfigure(2, weight=1)
         right_frame.columnconfigure(0, weight=1)
         
         # Información del proceso
-        info_frame = ttk.LabelFrame(right_frame, text="📊 Información del Proceso", padding="8")
+        bar_chart_icon = icon_manager.get_icon_for_emoji("📊", (16, 16))
+        if bar_chart_icon:
+            info_frame = ttk.LabelFrame(right_frame, text="Información del Proceso", padding="8")
+        else:
+            info_frame = ttk.LabelFrame(right_frame, text="📊 Información del Proceso", padding="8")
         info_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 15))
         info_frame.columnconfigure(1, weight=1)
         
@@ -173,9 +212,15 @@ class UIComponents:
         manager.selected_process_label.configure(foreground='blue')
         
         # Frame de selección de CPUs
-        cpu_frame = ttk.LabelFrame(right_frame, 
-                                  text=f"🔧 Seleccionar CPUs ({manager.cpu_count} disponibles)", 
-                                  padding="10")
+        wrench_icon = icon_manager.get_icon_for_emoji("🔧", (16, 16))
+        if wrench_icon:
+            cpu_frame = ttk.LabelFrame(right_frame, 
+                                      text=f"Seleccionar CPUs ({manager.cpu_count} disponibles)", 
+                                      padding="10")
+        else:
+            cpu_frame = ttk.LabelFrame(right_frame, 
+                                      text=f"🔧 Seleccionar CPUs ({manager.cpu_count} disponibles)", 
+                                      padding="10")
         cpu_frame.grid(row=2, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 15))
         
         # Checkboxes de CPUs
@@ -199,31 +244,45 @@ class UIComponents:
         cpu_button_frame.columnconfigure(0, weight=1)
         cpu_button_frame.columnconfigure(1, weight=1)
         
-        ttk.Button(cpu_button_frame, text="✅ Seleccionar Todas", 
-                  command=manager.select_all_cpus).grid(row=0, column=0, padx=(0, 5), sticky=(tk.W, tk.E))
-        ttk.Button(cpu_button_frame, text="❌ Deseleccionar Todas", 
-                  command=manager.deselect_all_cpus).grid(row=0, column=1, padx=(5, 0), sticky=(tk.W, tk.E))
+        create_labeled_button(cpu_button_frame, "✅ Seleccionar Todas", 
+                            command=manager.select_all_cpus).grid(row=0, column=0, padx=(0, 5), sticky=(tk.W, tk.E))
+        create_labeled_button(cpu_button_frame, "❌ Deseleccionar Todas", 
+                            command=manager.deselect_all_cpus).grid(row=0, column=1, padx=(5, 0), sticky=(tk.W, tk.E))
         
         # Botones principales
-        manager.apply_btn = ttk.Button(right_frame, text="🚀 Aplicar Afinidad", 
-                                      command=manager.apply_affinity, state='disabled',
-                                      style='Accent.TButton')
+        manager.apply_btn = create_labeled_button(right_frame, "🚀 Aplicar Afinidad", 
+                                                command=manager.apply_affinity, state='disabled')
+        # Configurar estilo de acento si está disponible
+        try:
+            manager.apply_btn.configure(style='Accent.TButton')
+        except:
+            pass
         manager.apply_btn.grid(row=4, column=0, pady=(15, 8), sticky=(tk.W, tk.E))
         
-        manager.create_task_btn = ttk.Button(right_frame, text="🔧 Crear Tarea Automatizada", 
-                                            command=manager.show_create_task_dialog, state='disabled')
+        manager.create_task_btn = create_labeled_button(right_frame, "🔧 Crear Tarea Automatizada", 
+                                                      command=manager.show_create_task_dialog, state='disabled')
         manager.create_task_btn.grid(row=5, column=0, pady=(0, 10), sticky=(tk.W, tk.E))
 
     def setup_tasks_tab(self, manager):
         """Configura la pestaña de tareas automatizadas"""
         tasks_frame = ttk.Frame(manager.notebook)
-        manager.notebook.add(tasks_frame, text="⚡ Tareas Automatizadas")
+        
+        # Agregar pestaña con icono si está disponible
+        rocket_icon = icon_manager.get_icon_for_emoji("⚡", (16, 16))
+        if rocket_icon:
+            manager.notebook.add(tasks_frame, text="Tareas Automatizadas")
+        else:
+            manager.notebook.add(tasks_frame, text="⚡ Tareas Automatizadas")
         
         tasks_frame.columnconfigure(0, weight=1)
         tasks_frame.rowconfigure(1, weight=1)
         
         # Frame superior - Controles
-        control_frame = ttk.LabelFrame(tasks_frame, text="🎛️ Controles de Tareas", padding="10")
+        control_knobs_icon = icon_manager.get_icon_for_emoji("🎛️", (16, 16))
+        if control_knobs_icon:
+            control_frame = ttk.LabelFrame(tasks_frame, text="Controles de Tareas", padding="10")
+        else:
+            control_frame = ttk.LabelFrame(tasks_frame, text="🎛️ Controles de Tareas", padding="10")
         control_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 15))
         control_frame.columnconfigure(0, weight=1)
         
@@ -231,39 +290,62 @@ class UIComponents:
         buttons_frame = ttk.Frame(control_frame)
         buttons_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
         
-        ttk.Button(buttons_frame, text="✏️ Editar Tarea", 
-                  command=lambda: manager.task_manager.edit_task_dialog(
-                      manager.tasks_tree.selection()[0] if manager.tasks_tree.selection() else None
-                  )).pack(side=tk.LEFT, padx=(0, 8))
+        create_labeled_button(buttons_frame, "✏️ Editar Tarea", 
+                            command=lambda: manager.task_manager.edit_task_dialog(
+                                manager.tasks_tree.selection()[0] if manager.tasks_tree.selection() else None
+                            )).pack(side=tk.LEFT, padx=(0, 8))
                   
-        ttk.Button(buttons_frame, text="🗑️ Eliminar Tarea",
-                  command=lambda: manager.task_manager.delete_task_with_confirmation(
-                      manager.tasks_tree.selection()[0] if manager.tasks_tree.selection() else None
-                  )).pack(side=tk.LEFT, padx=(0, 8))
+        create_labeled_button(buttons_frame, "🗑️ Eliminar Tarea",
+                            command=lambda: manager.task_manager.delete_task_with_confirmation(
+                                manager.tasks_tree.selection()[0] if manager.tasks_tree.selection() else None
+                            )).pack(side=tk.LEFT, padx=(0, 8))
                   
-        ttk.Button(buttons_frame, text="🧪 Probar Tarea",
-                  command=lambda: manager.task_manager.execute_automated_task(
-                      manager.tasks_tree.selection()[0] if manager.tasks_tree.selection() else None
-                  )).pack(side=tk.LEFT)
+        create_labeled_button(buttons_frame, "🧪 Probar Tarea",
+                            command=lambda: manager.task_manager.execute_automated_task(
+                                manager.tasks_tree.selection()[0] if manager.tasks_tree.selection() else None
+                            )).pack(side=tk.LEFT)
         
         # Estado del sistema
         status_frame = ttk.Frame(control_frame)
         status_frame.grid(row=1, column=0, pady=8, sticky=(tk.W, tk.E))
         
-        ttk.Label(status_frame, text="🔘 Estado del Sistema:", 
-                 font=('Arial', 9, 'bold')).pack(side=tk.LEFT)
-        manager.keyboard_status_label = ttk.Label(status_frame, text="Iniciado", 
-                                                foreground='green', font=('Arial', 9, 'bold'))
+        green_icon = icon_manager.get_icon_for_emoji("🔘", (16, 16))
+        if green_icon:
+            status_label = ttk.Label(status_frame, text="Estado del Sistema:", 
+                                   font=('Arial', 9, 'bold'))
+            status_label.pack(side=tk.LEFT)
+            
+            manager.keyboard_status_label = ttk.Label(status_frame, text="Iniciado", 
+                                                    foreground='green', font=('Arial', 9, 'bold'),
+                                                    image=green_icon, compound="left")
+            manager.keyboard_status_label.image = green_icon
+        else:
+            ttk.Label(status_frame, text="🔘 Estado del Sistema:", 
+                     font=('Arial', 9, 'bold')).pack(side=tk.LEFT)
+            manager.keyboard_status_label = ttk.Label(status_frame, text="Iniciado", 
+                                                    foreground='green', font=('Arial', 9, 'bold'))
         manager.keyboard_status_label.pack(side=tk.LEFT, padx=(8, 0))
         
         # Información sobre hotkeys
-        info_label = ttk.Label(control_frame, 
-                              text="💡 Los hotkeys funcionan globalmente (incluso en pantalla completa)", 
-                              font=('Arial', 9, 'bold'), foreground='blue')
+        info_icon = icon_manager.get_icon_for_emoji("💡", (16, 16))
+        if info_icon:
+            info_label = ttk.Label(control_frame, 
+                                  text="Los hotkeys funcionan globalmente (incluso en pantalla completa)", 
+                                  font=('Arial', 9, 'bold'), foreground='blue',
+                                  image=info_icon, compound="left")
+            info_label.image = info_icon
+        else:
+            info_label = ttk.Label(control_frame, 
+                                  text="💡 Los hotkeys funcionan globalmente (incluso en pantalla completa)", 
+                                  font=('Arial', 9, 'bold'), foreground='blue')
         info_label.grid(row=2, column=0, pady=(5, 0))
         
         # Frame central - Lista de tareas
-        list_frame = ttk.LabelFrame(tasks_frame, text="📋 Tareas Configuradas", padding="8")
+        clipboard_icon = icon_manager.get_icon_for_emoji("📋", (16, 16))
+        if clipboard_icon:
+            list_frame = ttk.LabelFrame(tasks_frame, text="Tareas Configuradas", padding="8")
+        else:
+            list_frame = ttk.LabelFrame(tasks_frame, text="📋 Tareas Configuradas", padding="8")
         list_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         list_frame.columnconfigure(0, weight=1)
         list_frame.rowconfigure(0, weight=1)
@@ -272,14 +354,14 @@ class UIComponents:
         columns = ('Nombre', 'Proceso', 'Hotkey', 'CPUs', 'Estado', 'Alertas', 'Info')
         manager.tasks_tree = ttk.Treeview(list_frame, columns=columns, show='headings', height=20)
         
-        # Configurar columnas
-        manager.tasks_tree.heading('Nombre', text='📝 Nombre de la Tarea')
-        manager.tasks_tree.heading('Proceso', text='🎯 Proceso Objetivo')
-        manager.tasks_tree.heading('Hotkey', text='⌨️ Tecla Rápida')
-        manager.tasks_tree.heading('CPUs', text='💻 CPUs Asignadas')
-        manager.tasks_tree.heading('Estado', text='📊 Estado')
-        manager.tasks_tree.heading('Alertas', text='🔔 Alertas')
-        manager.tasks_tree.heading('Info', text='ℹ️ Info')
+        # Configurar columnas (sin emojis en los encabezados por limitaciones de treeview)
+        manager.tasks_tree.heading('Nombre', text='Nombre de la Tarea')
+        manager.tasks_tree.heading('Proceso', text='Proceso Objetivo')
+        manager.tasks_tree.heading('Hotkey', text='Tecla Rápida')
+        manager.tasks_tree.heading('CPUs', text='CPUs Asignadas')
+        manager.tasks_tree.heading('Estado', text='Estado')
+        manager.tasks_tree.heading('Alertas', text='Alertas')
+        manager.tasks_tree.heading('Info', text='Info')
         
         # Anchos de columnas
         manager.tasks_tree.column('Nombre', width=180, minwidth=120)
@@ -341,7 +423,13 @@ class UIComponents:
     def setup_hotkey_service_tab(self, manager):
         """Configura la pestaña de administración del servicio de hotkeys"""
         hotkey_frame = ttk.Frame(manager.notebook)
-        manager.notebook.add(hotkey_frame, text="⌨️ Servicio de Hotkeys")
+        
+        # Agregar pestaña con icono si está disponible
+        keyboard_icon = icon_manager.get_icon_for_emoji("⌨️", (16, 16))
+        if keyboard_icon:
+            manager.notebook.add(hotkey_frame, text="Servicio de Hotkeys")
+        else:
+            manager.notebook.add(hotkey_frame, text="⌨️ Servicio de Hotkeys")
         
         # Configurar el frame principal para el scrolling
         hotkey_frame.columnconfigure(0, weight=1)
@@ -395,8 +483,17 @@ class UIComponents:
         
         ttk.Label(status_frame, text="Estado del Servicio:", 
                  font=('Arial', 12, 'bold')).grid(row=0, column=0, sticky=tk.W)
-        manager.service_status_label = ttk.Label(status_frame, text="🟢 Funcionando", 
-                                               foreground='green', font=('Arial', 12, 'bold'))
+        
+        # Inicializar con estado verde/funcionando
+        green_icon = icon_manager.get_icon_for_emoji("🟢", (16, 16))
+        if green_icon:
+            manager.service_status_label = ttk.Label(status_frame, text="Funcionando", 
+                                                   foreground='green', font=('Arial', 12, 'bold'),
+                                                   image=green_icon, compound="left")
+            manager.service_status_label.image = green_icon
+        else:
+            manager.service_status_label = ttk.Label(status_frame, text="🟢 Funcionando", 
+                                                   foreground='green', font=('Arial', 12, 'bold'))
         manager.service_status_label.grid(row=0, column=1, sticky=tk.W, padx=(10, 0))
         
         # Información del servicio
@@ -422,17 +519,21 @@ class UIComponents:
         buttons_frame = ttk.Frame(service_frame)
         buttons_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=(10, 0))
         
-        ttk.Button(buttons_frame, text="🔄 Reiniciar Servicio", 
-                  command=lambda: manager.restart_hotkey_service()).pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Button(buttons_frame, text="⚠️ Detener Servicio", 
-                  command=lambda: manager.stop_hotkey_service()).pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Button(buttons_frame, text="▶️ Iniciar Servicio", 
-                  command=lambda: manager.start_hotkey_service()).pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Button(buttons_frame, text="🧪 Probar Captura", 
-                  command=lambda: manager.test_hotkey_capture()).pack(side=tk.LEFT)
+        create_labeled_button(buttons_frame, "🔄 Reiniciar Servicio", 
+                            command=lambda: manager.restart_hotkey_service()).pack(side=tk.LEFT, padx=(0, 8))
+        create_labeled_button(buttons_frame, "⚠️ Detener Servicio", 
+                            command=lambda: manager.stop_hotkey_service()).pack(side=tk.LEFT, padx=(0, 8))
+        create_labeled_button(buttons_frame, "▶️ Iniciar Servicio", 
+                            command=lambda: manager.start_hotkey_service()).pack(side=tk.LEFT, padx=(0, 8))
+        create_labeled_button(buttons_frame, "🧪 Probar Captura", 
+                            command=lambda: manager.test_hotkey_capture()).pack(side=tk.LEFT)
         
         # Frame central - Lista de hotkeys activos
-        hotkeys_frame = ttk.LabelFrame(scrollable_frame, text="📋 Hotkeys Registrados", padding="8")
+        clipboard_icon = icon_manager.get_icon_for_emoji("📋", (16, 16))
+        if clipboard_icon:
+            hotkeys_frame = ttk.LabelFrame(scrollable_frame, text="Hotkeys Registrados", padding="8")
+        else:
+            hotkeys_frame = ttk.LabelFrame(scrollable_frame, text="📋 Hotkeys Registrados", padding="8")
         hotkeys_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 15), padx=10)
         hotkeys_frame.columnconfigure(0, weight=1)
         hotkeys_frame.rowconfigure(0, weight=1)
@@ -441,13 +542,13 @@ class UIComponents:
         hotkey_columns = ('Combinación', 'Tarea', 'Proceso', 'Estado', 'Última Activación', 'Contador')
         manager.hotkeys_tree = ttk.Treeview(hotkeys_frame, columns=hotkey_columns, show='headings', height=10)
         
-        # Configurar columnas
-        manager.hotkeys_tree.heading('Combinación', text='⌨️ Combinación de Teclas')
-        manager.hotkeys_tree.heading('Tarea', text='📝 Tarea Asociada')
-        manager.hotkeys_tree.heading('Proceso', text='🎯 Proceso Objetivo')
-        manager.hotkeys_tree.heading('Estado', text='📊 Estado')
-        manager.hotkeys_tree.heading('Última Activación', text='🕒 Última Activación')
-        manager.hotkeys_tree.heading('Contador', text='🔢 Veces Usado')
+        # Configurar columnas (sin emojis en encabezados)
+        manager.hotkeys_tree.heading('Combinación', text='Combinación de Teclas')
+        manager.hotkeys_tree.heading('Tarea', text='Tarea Asociada')
+        manager.hotkeys_tree.heading('Proceso', text='Proceso Objetivo')
+        manager.hotkeys_tree.heading('Estado', text='Estado')
+        manager.hotkeys_tree.heading('Última Activación', text='Última Activación')
+        manager.hotkeys_tree.heading('Contador', text='Veces Usado')
         
         # Anchos de columnas
         manager.hotkeys_tree.column('Combinación', width=120, minwidth=100)
@@ -465,7 +566,11 @@ class UIComponents:
         manager.hotkeys_tree.configure(yscrollcommand=hotkey_scrollbar.set)
         
         # Frame inferior - Configuración avanzada
-        config_frame = ttk.LabelFrame(scrollable_frame, text="⚙️ Configuración Avanzada", padding="10")
+        gear_icon = icon_manager.get_icon_for_emoji("⚙️", (16, 16))
+        if gear_icon:
+            config_frame = ttk.LabelFrame(scrollable_frame, text="Configuración Avanzada", padding="10")
+        else:
+            config_frame = ttk.LabelFrame(scrollable_frame, text="⚙️ Configuración Avanzada", padding="10")
         config_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=(0, 15), padx=10)
         config_frame.columnconfigure(1, weight=1)
         
@@ -486,15 +591,16 @@ class UIComponents:
         config_buttons_frame = ttk.Frame(config_frame)
         config_buttons_frame.grid(row=2, column=0, columnspan=2, pady=(15, 0))
         
-        ttk.Button(config_buttons_frame, text="💾 Guardar Configuración", 
-                  command=lambda: manager.save_hotkey_config()).pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Button(config_buttons_frame, text="🔄 Cargar Configuración", 
-                  command=lambda: manager.load_hotkey_config()).pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Button(config_buttons_frame, text="🏭 Restaurar Por Defecto", 
-                  command=lambda: manager.reset_hotkey_config()).pack(side=tk.LEFT)
+        create_labeled_button(config_buttons_frame, "💾 Guardar Configuración", 
+                            command=lambda: manager.save_hotkey_config()).pack(side=tk.LEFT, padx=(0, 8))
+        create_labeled_button(config_buttons_frame, "🔄 Cargar Configuración", 
+                            command=lambda: manager.load_hotkey_config()).pack(side=tk.LEFT, padx=(0, 8))
+        create_labeled_button(config_buttons_frame, "🏭 Restaurar Por Defecto", 
+                            command=lambda: manager.reset_hotkey_config()).pack(side=tk.LEFT)
 
         # Nueva sección: Sistema de Monitoreo y Recuperación Automática
-        monitoring_frame = ttk.LabelFrame(scrollable_frame, text="🔍 Sistema de Monitoreo y Recuperación", padding="15")
+        # Aquí no uso icono en el título porque es demasiado largo
+        monitoring_frame = ttk.LabelFrame(scrollable_frame, text="Sistema de Monitoreo y Recuperación", padding="15")
         monitoring_frame.grid(row=3, column=0, sticky=(tk.W, tk.E), pady=(0, 15), padx=10)
         monitoring_frame.columnconfigure(1, weight=1)
         
@@ -505,8 +611,17 @@ class UIComponents:
         
         ttk.Label(health_frame, text="Estado de Salud:", 
                  font=('Arial', 12, 'bold')).grid(row=0, column=0, sticky=tk.W)
-        manager.health_status_label = ttk.Label(health_frame, text="⚪ Inicializando...", 
-                                              font=('Arial', 12, 'bold'))
+        
+        # Inicializar con estado desconocido
+        white_icon = icon_manager.get_icon_for_emoji("⚪", (16, 16))
+        if white_icon:
+            manager.health_status_label = ttk.Label(health_frame, text="Inicializando...", 
+                                                  font=('Arial', 12, 'bold'),
+                                                  image=white_icon, compound="left")
+            manager.health_status_label.image = white_icon
+        else:
+            manager.health_status_label = ttk.Label(health_frame, text="⚪ Inicializando...", 
+                                                  font=('Arial', 12, 'bold'))
         manager.health_status_label.grid(row=0, column=1, sticky=tk.W, padx=(10, 0))
         
         # Información de monitoreo
@@ -554,14 +669,14 @@ class UIComponents:
         monitor_buttons_frame = ttk.Frame(monitoring_frame)
         monitor_buttons_frame.grid(row=3, column=0, columnspan=2, pady=(10, 0))
         
-        ttk.Button(monitor_buttons_frame, text="🔧 Prueba Manual", 
-                  command=lambda: manager.manual_recovery_test()).pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Button(monitor_buttons_frame, text="🔄 Reset Contador", 
-                  command=lambda: manager.reset_recovery_counter()).pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Button(monitor_buttons_frame, text="⚡ Aplicar Timeout", 
-                  command=lambda: manager.set_monitoring_timeout()).pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Button(monitor_buttons_frame, text="📊 Ver Estado", 
-                  command=lambda: manager._update_monitoring_ui()).pack(side=tk.LEFT)
+        create_labeled_button(monitor_buttons_frame, "🔧 Prueba Manual", 
+                            command=lambda: manager.manual_recovery_test()).pack(side=tk.LEFT, padx=(0, 8))
+        create_labeled_button(monitor_buttons_frame, "🔄 Reset Contador", 
+                            command=lambda: manager.reset_recovery_counter()).pack(side=tk.LEFT, padx=(0, 8))
+        create_labeled_button(monitor_buttons_frame, "⚡ Aplicar Timeout", 
+                            command=lambda: manager.set_monitoring_timeout()).pack(side=tk.LEFT, padx=(0, 8))
+        create_labeled_button(monitor_buttons_frame, "📊 Ver Estado", 
+                            command=lambda: manager._update_monitoring_ui()).pack(side=tk.LEFT)
         
         # Agregar un poco de espacio al final para mejor apariencia
         ttk.Label(scrollable_frame, text="").grid(row=4, column=0, pady=20)

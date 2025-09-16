@@ -39,6 +39,7 @@ except ImportError:
 
 from ui_components import UIComponents
 from task_manager import TaskManager, TaskDialog
+from icon_utils import icon_manager
 
 class AffinityManager:
     def __init__(self, root):
@@ -61,8 +62,8 @@ class AffinityManager:
         self.notification_config = {
             'sound_enabled': True,
             'sound_file': None,
-            'message_high': "🚀 Afinidad ALTA aplicada",
-            'message_low': "💚 Afinidad BAJA aplicada",
+            'message_high': f"{icon_manager.emoji_to_icon.get('🚀', 'Rocket.png')} Afinidad ALTA aplicada",
+            'message_low': f"{icon_manager.emoji_to_icon.get('💚', 'GreenHeart.png')} Afinidad BAJA aplicada",
             'show_process_name': True,
             'duration': 3000,
             'position': 'top-right'
@@ -136,13 +137,17 @@ class AffinityManager:
         timestamp = time.strftime("%H:%M:%S")
         
         if level == "error":
-            prefix = "❌"
+            prefix_icon = icon_manager.get_icon_path("❌")
+            prefix = "❌" if not prefix_icon else "Error"
         elif level == "warning":
-            prefix = "⚠️"
+            prefix_icon = icon_manager.get_icon_path("⚠️")
+            prefix = "⚠️" if not prefix_icon else "Advertencia"
         elif level == "success":
-            prefix = "✅"
+            prefix_icon = icon_manager.get_icon_path("✅")
+            prefix = "✅" if not prefix_icon else "Éxito"
         else:
-            prefix = "ℹ️"
+            prefix_icon = icon_manager.get_icon_path("ℹ️")
+            prefix = "ℹ️" if not prefix_icon else "Info"
         
         if hasattr(self, 'log_text') and self.log_text:
             self.log_text.config(state='normal')
@@ -441,7 +446,7 @@ class AffinityManager:
             
             # Configurar el estilo
             bg_color = "#4CAF50"  # Verde para todas las notificaciones
-            icon = "🎯"  # Icono de objetivo para indicar que se aplicó la afinidad
+            target_icon = icon_manager.get_icon_for_emoji("🎯", (24, 24))  # Icono de objetivo
             
             # Configurar la ventana
             notif.configure(bg=bg_color)
@@ -450,10 +455,18 @@ class AffinityManager:
             main_frame = ttk.Frame(notif, padding="10")
             main_frame.pack(fill=tk.BOTH, expand=True)
             
-            # Mensaje con icono
-            msg_label = ttk.Label(main_frame, 
-                                text=f"{icon} {message}",
-                                font=('Arial', 10, 'bold'))
+            # Mensaje con icono (si está disponible)
+            if target_icon:
+                msg_label = ttk.Label(main_frame, 
+                                    text=message,
+                                    image=target_icon,
+                                    compound="left",
+                                    font=('Arial', 10, 'bold'))
+                msg_label.image = target_icon  # Mantener referencia
+            else:
+                msg_label = ttk.Label(main_frame, 
+                                    text=f"🎯 {message}",
+                                    font=('Arial', 10, 'bold'))
             msg_label.pack(pady=5)
             
             # Posicionar la ventana
@@ -509,12 +522,26 @@ class AffinityManager:
                     # Ocultar log
                     self.log_text.grid_remove()
                     self.log_visible.set(False)
-                    self.toggle_log_btn.config(text="👁️ Mostrar Log")
+                    
+                    # Intentar usar icono, si no está disponible usar emoji
+                    eye_icon = icon_manager.get_icon_for_emoji("👁️", (16, 16))
+                    if eye_icon:
+                        self.toggle_log_btn.config(text="Mostrar Log", image=eye_icon, compound="left")
+                        self.toggle_log_btn.image = eye_icon
+                    else:
+                        self.toggle_log_btn.config(text="👁️ Mostrar Log")
                 else:
                     # Mostrar log
                     self.log_text.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
                     self.log_visible.set(True)
-                    self.toggle_log_btn.config(text="👁️ Ocultar Log")
+                    
+                    # Intentar usar icono, si no está disponible usar emoji
+                    eye_icon = icon_manager.get_icon_for_emoji("👁️", (16, 16))
+                    if eye_icon:
+                        self.toggle_log_btn.config(text="Ocultar Log", image=eye_icon, compound="left")
+                        self.toggle_log_btn.image = eye_icon
+                    else:
+                        self.toggle_log_btn.config(text="👁️ Ocultar Log")
         except Exception as e:
             print(f"Error alternando visibilidad del log: {str(e)}")
     
@@ -678,7 +705,15 @@ class AffinityManager:
         try:
             # Crear ventana de prueba
             test_window = tk.Toplevel(self.root)
-            test_window.title("🧪 Prueba de Captura de Hotkeys")
+            
+            # Título con icono si está disponible
+            test_tube_icon = icon_manager.get_icon_for_emoji("🧪", (16, 16))
+            if test_tube_icon:
+                test_window.title("Prueba de Captura de Hotkeys")
+                # Para el título podríamos usar el icono en el contenido
+            else:
+                test_window.title("🧪 Prueba de Captura de Hotkeys")
+                
             test_window.geometry("500x300")
             test_window.transient(self.root)
             test_window.grab_set()
@@ -693,9 +728,19 @@ class AffinityManager:
             main_frame = ttk.Frame(test_window, padding="20")
             main_frame.pack(fill=tk.BOTH, expand=True)
             
-            # Título
-            ttk.Label(main_frame, text="Prueba de Captura de Teclas",
-                     font=('Arial', 14, 'bold')).pack(pady=(0, 15))
+            # Título con icono
+            title_frame = ttk.Frame(main_frame)
+            title_frame.pack(pady=(0, 15))
+            
+            if test_tube_icon:
+                title_label = ttk.Label(title_frame, text="Prueba de Captura de Teclas",
+                                       image=test_tube_icon, compound="left",
+                                       font=('Arial', 14, 'bold'))
+                title_label.image = test_tube_icon
+            else:
+                title_label = ttk.Label(title_frame, text="🧪 Prueba de Captura de Teclas",
+                                       font=('Arial', 14, 'bold'))
+            title_label.pack()
             
             # Instrucciones
             instructions = ttk.Label(main_frame, 
@@ -779,7 +824,19 @@ class AffinityManager:
                     usage_count = stats.get('count', 0)
                     
                     # Estado del hotkey
-                    status = "🟢 Activo" if hotkey in self.task_manager.hotkey_listeners else "🔴 Inactivo"
+                    green_icon_path = icon_manager.get_icon_path("🟢")
+                    red_icon_path = icon_manager.get_icon_path("🔴")
+                    
+                    if hotkey in self.task_manager.hotkey_listeners:
+                        if green_icon_path:
+                            status = "Activo"
+                        else:
+                            status = "🟢 Activo"
+                    else:
+                        if red_icon_path:
+                            status = "Inactivo"
+                        else:
+                            status = "🔴 Inactivo"
                     
                     self.hotkeys_tree.insert('', 'end', values=(
                         hotkey,
@@ -917,14 +974,14 @@ class AffinityManager:
                 
                 # Verificar si han pasado demasiados minutos sin captura
                 if time_since_last_key > self.keypress_timeout and self.auto_recovery_enabled:
-                    self.log_message(f"⚠️ No se han detectado teclas en {int(time_since_last_key/60)} minutos", "warning")
+                    self.log_message(f"No se han detectado teclas en {int(time_since_last_key/60)} minutos", "warning")
                     
                     # Realizar test de captura
                     if not self._test_key_capture():
-                        self.log_message("❌ Test de captura falló - Iniciando recuperación automática", "error")
+                        self.log_message("Test de captura falló - Iniciando recuperación automática", "error")
                         self._attempt_service_recovery()
                     else:
-                        self.log_message("✅ Test de captura exitoso - Servicio funcionando", "success")
+                        self.log_message("Test de captura exitoso - Servicio funcionando", "success")
                         self.service_health_status = "healthy"
                 
                 # Actualizar UI cada 10 segundos
@@ -964,12 +1021,12 @@ class AffinityManager:
         """Intenta recuperar el servicio de captura de teclas"""
         try:
             if self.recovery_attempts >= self.max_recovery_attempts:
-                self.log_message(f"❌ Máximo de intentos de recuperación alcanzado ({self.max_recovery_attempts})", "error")
+                self.log_message(f"Máximo de intentos de recuperación alcanzado ({self.max_recovery_attempts})", "error")
                 self.service_health_status = "failed"
                 return False
             
             self.recovery_attempts += 1
-            self.log_message(f"🔄 Intento de recuperación #{self.recovery_attempts}", "warning")
+            self.log_message(f"Intento de recuperación #{self.recovery_attempts}", "warning")
             
             # Método 1: Reiniciar servicio de hotkeys
             self.log_message("Reiniciando servicio de hotkeys...", "info")
@@ -978,7 +1035,7 @@ class AffinityManager:
             # Esperar y probar
             time.sleep(2)
             if self._test_key_capture():
-                self.log_message("✅ Recuperación exitosa con reinicio de servicio", "success")
+                self.log_message("Recuperación exitosa con reinicio de servicio", "success")
                 self.recovery_attempts = 0
                 self.service_health_status = "recovered"
                 self.last_recovery_time = time.time()
@@ -990,7 +1047,7 @@ class AffinityManager:
             
             time.sleep(2)
             if self._test_key_capture():
-                self.log_message("✅ Recuperación exitosa con reconfiguración", "success")
+                self.log_message("Recuperación exitosa con reconfiguración", "success")
                 self.recovery_attempts = 0
                 self.service_health_status = "recovered"
                 self.last_recovery_time = time.time()
@@ -1002,13 +1059,13 @@ class AffinityManager:
             
             time.sleep(3)
             if self._test_key_capture():
-                self.log_message("✅ Recuperación exitosa con reset completo", "success")
+                self.log_message("Recuperación exitosa con reset completo", "success")
                 self.recovery_attempts = 0
                 self.service_health_status = "recovered"
                 self.last_recovery_time = time.time()
                 return True
             
-            self.log_message(f"❌ Intento de recuperación #{self.recovery_attempts} falló", "error")
+            self.log_message(f"Intento de recuperación #{self.recovery_attempts} falló", "error")
             self.service_health_status = "recovery_failed"
             return False
             
@@ -1076,17 +1133,40 @@ class AffinityManager:
                 return
                 
             status_colors = {
-                "healthy": ("🟢 Saludable", "green"),
-                "unhealthy": ("🟡 Problemático", "orange"),
-                "error": ("🔴 Error", "red"),
-                "recovery_failed": ("❌ Fallo Total", "red"),
-                "recovered": ("🟢 Recuperado", "green"),
-                "failed": ("💀 Fallido", "red"),
-                "unknown": ("⚪ Desconocido", "gray")
+                "healthy": ("Saludable", "green"),
+                "unhealthy": ("Problemático", "orange"),
+                "error": ("Error", "red"),
+                "recovery_failed": ("Fallo Total", "red"),
+                "recovered": ("Recuperado", "green"),
+                "failed": ("Fallido", "red"),
+                "unknown": ("Desconocido", "gray")
             }
             
-            text, color = status_colors.get(self.service_health_status, ("⚪ Desconocido", "gray"))
-            self.health_status_label.config(text=text, foreground=color)
+            # Intentar usar iconos según el estado
+            status_text, color = status_colors.get(self.service_health_status, ("Desconocido", "gray"))
+            
+            # Mapear estados a emojis para obtener iconos
+            status_emojis = {
+                "healthy": "🟢",
+                "unhealthy": "🟡", 
+                "error": "🔴",
+                "recovery_failed": "❌",
+                "recovered": "🟢",
+                "failed": "💀",
+                "unknown": "⚪"
+            }
+            
+            emoji = status_emojis.get(self.service_health_status, "⚪")
+            status_icon = icon_manager.get_icon_for_emoji(emoji, (16, 16))
+            
+            if status_icon:
+                self.health_status_label.config(text=status_text, foreground=color, 
+                                               image=status_icon, compound="left")
+                self.health_status_label.image = status_icon
+            else:
+                # Fallback a emoji si no hay icono
+                text = f"{emoji} {status_text}"
+                self.health_status_label.config(text=text, foreground=color)
             
         except Exception as e:
             pass
@@ -1122,7 +1202,7 @@ class AffinityManager:
     def manual_recovery_test(self):
         """Ejecuta manualmente una prueba de recuperación"""
         try:
-            self.log_message("🧪 Iniciando prueba manual de recuperación...", "info")
+            self.log_message("Iniciando prueba manual de recuperación...", "info")
             
             # Forzar un intento de recuperación
             old_attempts = self.recovery_attempts
@@ -1131,10 +1211,10 @@ class AffinityManager:
             success = self._attempt_service_recovery()
             
             if success:
-                self.log_message("✅ Prueba manual de recuperación exitosa", "success")
+                self.log_message("Prueba manual de recuperación exitosa", "success")
                 self.last_recovery_time = time.time()
             else:
-                self.log_message("❌ Prueba manual de recuperación falló", "error")
+                self.log_message("Prueba manual de recuperación falló", "error")
                 self.recovery_attempts = old_attempts  # Restaurar si falló
                 
         except Exception as e:

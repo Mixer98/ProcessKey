@@ -5,10 +5,11 @@ Una aplicación de escritorio con interfaz gráfica para gestionar la afinidad d
 ## 🌟 Características
 
 ### **Control Manual**
-- **Interfaz gráfica intuitiva**: Fácil de usar con tkinter
+- **Interfaz gráfica intuitiva**: Fácil de usar con tkinter y **iconos PNG profesionales**
 - **Lista de procesos en tiempo real**: Visualiza todos los procesos activos con información de CPU y memoria
 - **Control granular de afinidad**: Selecciona qué CPUs puede usar cada proceso
 - **Verificación de permisos**: Detecta automáticamente si se ejecuta como administrador
+- **Sistema de iconos**: Reemplaza emojis con iconos PNG de alta calidad para mejor experiencia visual
 
 ### **🆕 Tareas Automatizadas (NUEVO)**
 - **Hotkeys globales**: Asigna combinaciones de teclas para alternar afinidad al vuelo
@@ -201,3 +202,10 @@ Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más det
 ---
 
 **Nota**: Esta herramienta es para usuarios avanzados que entienden las implicaciones de modificar la afinidad de procesos. Úsala bajo tu propio riesgo.
+
+### **Sistema de Iconos**
+- **Iconos PNG de alta calidad**: Reemplaza emojis con archivos PNG ubicados en `assets/icons/`
+- **Sistema de fallback**: Si los iconos no están disponibles, usa emojis automáticamente
+- **Cache inteligente**: Optimiza el rendimiento cargando iconos una sola vez
+- **Compatibilidad total**: Funciona sin modificar la lógica existente de la aplicación
+- **Fácil personalización**: Cambia los iconos reemplazando archivos en `assets/icons/`

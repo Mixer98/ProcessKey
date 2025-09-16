@@ -17,6 +17,7 @@ from typing import Dict, Any
 import shutil
 import keyboard
 import traceback
+from icon_utils import icon_manager, create_labeled_button, create_labeled_label
 
 # Inicializar pygame para el manejo de sonidos
 pygame.mixer.init()
@@ -557,12 +558,12 @@ class TaskDialog:
         button_frame = ttk.Frame(cpu_frame)
         button_frame.grid(row=0, column=0, columnspan=cols, sticky=tk.W, pady=(0, 10))
         
-        select_all_btn = ttk.Button(button_frame, text="Seleccionar todas", 
-                                  command=lambda: self.select_all_cpus(self.cpu_affinity_vars))
+        select_all_btn = create_labeled_button(button_frame, "✅ Seleccionar todas", 
+                                              command=lambda: self.select_all_cpus(self.cpu_affinity_vars))
         select_all_btn.pack(side=tk.LEFT, padx=(0, 5))
         
-        deselect_all_btn = ttk.Button(button_frame, text="Deseleccionar todas",
-                                    command=lambda: self.deselect_all_cpus(self.cpu_affinity_vars))
+        deselect_all_btn = create_labeled_button(button_frame, "❌ Deseleccionar todas",
+                                               command=lambda: self.deselect_all_cpus(self.cpu_affinity_vars))
         deselect_all_btn.pack(side=tk.LEFT)
         
         # Configuración de alertas
@@ -604,10 +605,10 @@ class TaskDialog:
         sound_entry = ttk.Entry(sound_frame, textvariable=self.sound_file_var, width=30)
         sound_entry.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=(0, 5))
         
-        browse_btn = ttk.Button(sound_frame, text="Examinar...", command=self.browse_sound_file)
+        browse_btn = create_labeled_button(sound_frame, "📁 Examinar...", command=self.browse_sound_file)
         browse_btn.grid(row=2, column=1, sticky=tk.W, padx=(5, 0), pady=(0, 5))
         
-        test_sound_btn = ttk.Button(sound_frame, text="Probar", command=self.test_sound)
+        test_sound_btn = create_labeled_button(sound_frame, "🧪 Probar", command=self.test_sound)
         test_sound_btn.grid(row=2, column=2, sticky=tk.W, padx=(5, 0), pady=(0, 5))
         
         # Botones del diálogo

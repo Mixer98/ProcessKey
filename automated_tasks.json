@@ -1,0 +1,21 @@
+{
+  "8d3e53fe-fc86-45ab-9386-cf168d1ce3cb": {
+    "name": "Tarea para Core Temp.exe",
+    "process_name": "Core Temp.exe",
+    "hotkey": "z+x",
+    "target_affinity": [
+      0,
+      1
+    ],
+    "alerts": [
+      "notification",
+      "system_sound",
+      "custom_sound",
+      "log_message"
+    ],
+    "custom_sound": {
+      "enabled": false,
+      "file": ""
+    }
+  }
+}
